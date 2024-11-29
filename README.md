@@ -26,5 +26,8 @@
 - With these repositories, S8050 + Genoa can boot to OS(Ubuntu) successfully
 - Support USB and NVME devices
 - Debug messages are available through BMC SOL
+
+
+## Existing Known Issues or Limitation
 - VGA in OS is not fully functioning
 - eSPI configurations in device tree are disabled
