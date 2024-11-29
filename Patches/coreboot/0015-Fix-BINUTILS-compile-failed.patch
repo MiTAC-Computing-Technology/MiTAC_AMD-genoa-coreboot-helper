@@ -1,0 +1,27 @@
+From bdb168536050f25edb39308ed8d41fe85fe07efc Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Fri, 29 Nov 2024 15:08:04 +0800
+Subject: [PATCH] Fix BINUTILS compile failed
+
+---
+ util/crossgcc/buildgcc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/util/crossgcc/buildgcc b/util/crossgcc/buildgcc
+index ad756652ed..e319d424c0 100755
+--- a/util/crossgcc/buildgcc
++++ b/util/crossgcc/buildgcc
+@@ -730,8 +730,8 @@ build_BINUTILS() {
+ 		--disable-docs \
+ 		--disable-texinfo \
+ 		${TARGET_BINUTILS_OPTIONS} \
+-		CFLAGS="$HOSTCFLAGS" \
+-		CXXFLAGS="$HOSTCFLAGS" || touch .failed
++		CFLAGS="$HOSTCFLAGS -std=c++0x" \
++		CXXFLAGS="$HOSTCFLAGS -std=c++0x" || touch .failed
+ 	# shellcheck disable=SC2086
+ 	$MAKE $JOBS || touch .failed
+ 	$MAKE install DESTDIR=$DESTDIR || touch .failed
+-- 
+2.34.1
+
