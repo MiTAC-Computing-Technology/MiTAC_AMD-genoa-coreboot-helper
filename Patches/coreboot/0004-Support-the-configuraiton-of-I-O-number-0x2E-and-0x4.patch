@@ -1,0 +1,40 @@
+From 0a5fdf6e023e78fd9240f9a9c4cc777021c3d88a Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 09:50:34 +0800
+Subject: [PATCH 04/14] Support the configuraiton of I/O number 0x2E and 0x4E
+ for Aspeed BMC Chip.
+
+---
+ src/superio/aspeed/ast2400/Kconfig | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/superio/aspeed/ast2400/Kconfig b/src/superio/aspeed/ast2400/Kconfig
+index 8f6f6acfff..81676dbab7 100644
+--- a/src/superio/aspeed/ast2400/Kconfig
++++ b/src/superio/aspeed/ast2400/Kconfig
+@@ -4,3 +4,22 @@ config SUPERIO_ASPEED_AST2400
+ 	bool
+ 	default n
+ 	select SUPERIO_ASPEED_COMMON_PRE_RAM
++
++choice
++	depends on USE_ASPEED_SIO
++        prompt "IO Port for Super I/O on Aspeed BMC chip."
++        default ASPEED_SIO_IO_PORT_2E
++        help
++          Assign io port for Super I/O.
++
++	config ASPEED_SIO_IO_PORT_2E
++		bool "Super I/O at 0x2E"
++
++	config ASPEED_SIO_IO_PORT_4E
++		bool "Super I/O at 0x4E"
++endchoice
++
++config ASPEED_SIO_USE_4E
++        bool
++        default n if ASPEED_SIO_IO_PORT_2E
++        default y if ASPEED_SIO_IO_PORT_4E
+-- 
+2.34.1
+

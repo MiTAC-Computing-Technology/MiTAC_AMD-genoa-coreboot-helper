@@ -1,0 +1,24 @@
+From c7d4ac0bd222ba7af0b572b869eb421565d093b2 Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 09:40:26 +0800
+Subject: [PATCH 01/14] Enable CF9 reset register for OS.
+
+---
+ src/soc/amd/genoa_poc/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/soc/amd/genoa_poc/Kconfig b/src/soc/amd/genoa_poc/Kconfig
+index f4bd7d6418..75e76ac01f 100644
+--- a/src/soc/amd/genoa_poc/Kconfig
++++ b/src/soc/amd/genoa_poc/Kconfig
+@@ -11,6 +11,7 @@ config SOC_SPECIFIC_OPTIONS
+ 	select ARCH_X86
+ 	select DEFAULT_X2APIC
+ 	select HAVE_ACPI_TABLES
++	select HAVE_CF9_RESET
+ 	select HAVE_X86_64_SUPPORT
+ 	select HAVE_SMI_HANDLER
+ 	select RESET_VECTOR_IN_RAM
+-- 
+2.34.1
+

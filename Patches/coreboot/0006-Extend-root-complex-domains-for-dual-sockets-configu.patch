@@ -1,0 +1,475 @@
+From 1c9be795c3d10ec2ffae3083b0eea1d5f0f17cc9 Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 10:25:32 +0800
+Subject: [PATCH 06/14] Extend root complex domains for dual sockets
+ configuration.
+
+---
+ src/soc/amd/genoa_poc/acpi/soc.asl   |   4 +
+ src/soc/amd/genoa_poc/chipset.cb     | 370 +++++++++++++++++++++++++++
+ src/soc/amd/genoa_poc/domain.c       |   7 +-
+ src/soc/amd/genoa_poc/root_complex.c |  16 ++
+ 4 files changed, 396 insertions(+), 1 deletion(-)
+
+diff --git a/src/soc/amd/genoa_poc/acpi/soc.asl b/src/soc/amd/genoa_poc/acpi/soc.asl
+index 75344dc325..872443e694 100644
+--- a/src/soc/amd/genoa_poc/acpi/soc.asl
++++ b/src/soc/amd/genoa_poc/acpi/soc.asl
+@@ -19,6 +19,10 @@ Scope(\_SB) {
+ 	ROOT_BRIDGE(S0B1)
+ 	ROOT_BRIDGE(S0B2)
+ 	ROOT_BRIDGE(S0B3)
++	ROOT_BRIDGE(S1B0)
++	ROOT_BRIDGE(S1B1)
++	ROOT_BRIDGE(S1B2)
++	ROOT_BRIDGE(S1B3)
+ } /* End \_SB scope */
+ 
+ #include <soc/amd/common/acpi/alib.asl>
+diff --git a/src/soc/amd/genoa_poc/chipset.cb b/src/soc/amd/genoa_poc/chipset.cb
+index 832b9b6f4a..ceaf95607c 100644
+--- a/src/soc/amd/genoa_poc/chipset.cb
++++ b/src/soc/amd/genoa_poc/chipset.cb
+@@ -9,6 +9,7 @@ chip soc/amd/genoa_poc
+ 	register "usb.usb3_oc_pins[0]" = "{ 0xf, 0xf, 0xf, 0xf }"
+ 	register "usb.usb3_oc_pins[1]" = "{ 0xf, 0xf, 0xf, 0xf }"
+ 
++	# Domains for Socket 0
+ 	device domain 0 on
+ 		ops genoa_pci_domain_ops
+ 		device pci 00.0 alias gnb_0 on end
+@@ -377,6 +378,375 @@ chip soc/amd/genoa_poc
+ 		end
+ 	end
+ 
++	# Domains for Socket 1
++	device domain 4 on
++		ops genoa_pci_domain_ops
++		device pci 00.0 alias s1_gnb_0 on end
++		device pci 00.2 alias s1_iommu_0 off ops amd_iommu_ops end
++		device pci 00.3 alias s1_rcec_0 off end
++
++		device pci 01.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.1 alias s1_gpp_bridge_0_0_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.2 alias s1_gpp_bridge_0_1_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.3 alias s1_gpp_bridge_0_2_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.4 alias s1_gpp_bridge_0_3_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.5 alias s1_gpp_bridge_0_4_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.6 alias s1_gpp_bridge_0_5_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.7 alias s1_gpp_bridge_0_6_a off end
++		end
++
++		device pci 02.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.1 alias s1_gpp_bridge_0_7_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.2 alias s1_gpp_bridge_0_8_a off end
++		end
++
++		device pci 03.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.1 alias s1_gpp_bridge_0_0_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.2 alias s1_gpp_bridge_0_1_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.3 alias s1_gpp_bridge_0_2_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.4 alias s1_gpp_bridge_0_3_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.5 alias s1_gpp_bridge_0_4_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.6 alias s1_gpp_bridge_0_5_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.7 alias s1_gpp_bridge_0_6_b off end
++		end
++
++		device pci 04.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.1 alias s1_gpp_bridge_0_7_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.2 alias s1_gpp_bridge_0_8_b off end
++		end
++
++		device pci 05.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.1 alias s1_gpp_bridge_0_0_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.2 alias s1_gpp_bridge_0_1_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.3 alias s1_gpp_bridge_0_2_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.4 alias s1_gpp_bridge_0_3_c off end
++		end
++
++		device pci 07.0 on end # Dummy device function, do not disable
++		device pci 07.1 alias s1_gpp_bridge_0_a off # Internal GPP Bridge 0 to Bus B0
++			device pci 0.0 on end # Dummy PCIe function
++			device pci 0.1 off end
++			device pci 0.2 alias s1_primary_NTB_0 off end # Primary PCIe Non-TransparentBridge
++			device pci 0.3 alias s1_secondry_NTB_0 off end # Secondary vNTB
++			device pci 0.4 alias s1_xhci_0 off end # USB
++			device pci 0.5 alias s1_mp0_0 off end # PSP (MP0)
++			device pci 0.6 alias s1_acp_0 off end # Audio Processor (ACP)
++			device pci 0.7 alias s1_hda_0 off end # Audio Processor HD Audio Controller (main AZ)
++		end
++		device pci 07.2 alias s1_gpp_bridge_0_b off # Internal GPP Bridge 1 to Bus C0
++			device pci 0.0 alias s1_sata_0_0 off end # first SATA controller; AHCI mode
++			device pci 0.1 alias s1_sata_0_1 off end # second SATA controller; AHCI mode
++		end
++
++		device pci 14.0 alias s1_smbus on end # primary FCH function
++		device pci 14.3 alias s1_lpc_bridge on ops amd_lpc_ops end
++		device pci 14.6 alias s1_sdhci off end
++
++		device pci 18.0 alias s1_data_fabric_0 on end
++		device pci 18.1 alias s1_data_fabric_1 on end
++		device pci 18.2 alias s1_data_fabric_2 on end
++		device pci 18.3 alias s1_data_fabric_3 on end
++		device pci 18.4 alias s1_data_fabric_4 on end
++		device pci 18.5 alias s1_data_fabric_5 on end
++		device pci 18.6 alias s1_data_fabric_6 on end
++		device pci 18.7 alias s1_data_fabric_7 on end
++	end
++
++	device domain 5 on
++		ops genoa_pci_domain_ops
++		device pci 00.0 alias s1_gnb_1 on end
++		device pci 00.2 alias s1_iommu_1 off ops amd_iommu_ops end
++		device pci 00.3 alias s1_rcec_1 off end
++
++		device pci 01.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.1 alias s1_gpp_bridge_1_0_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.2 alias s1_gpp_bridge_1_1_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.3 alias s1_gpp_bridge_1_2_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.4 alias s1_gpp_bridge_1_3_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.5 alias s1_gpp_bridge_1_4_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.6 alias s1_gpp_bridge_1_5_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.7 alias s1_gpp_bridge_1_6_a off end
++		end
++
++		device pci 02.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.1 alias s1_gpp_bridge_1_7_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.2 alias s1_gpp_bridge_1_8_a off end
++		end
++
++		device pci 03.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.1 alias s1_gpp_bridge_1_0_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.2 alias s1_gpp_bridge_1_1_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.3 alias s1_gpp_bridge_1_2_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.4 alias s1_gpp_bridge_1_3_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.5 alias s1_gpp_bridge_1_4_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.6 alias s1_gpp_bridge_1_5_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.7 alias s1_gpp_bridge_1_6_b off end
++		end
++
++		device pci 04.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.1 alias s1_gpp_bridge_1_7_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.2 alias s1_gpp_bridge_1_8_b off end
++		end
++
++		device pci 05.0 on end # Dummy device function, do not disable
++
++		device pci 07.0 on end # Dummy device function, do not disable
++		device pci 07.1 alias s1_gpp_bridge_1_a off
++			device pci 0.0 on end # Dummy PCIe function
++			device pci 0.1 off end #SDXI
++			device pci 0.2 alias s1_primary_NTB_1 off end # Primary PCIe Non-TransparentBridge
++			device pci 0.3 alias s1_secondry_NTB_1 off end # Secondary vNTB
++		end
++	end
++
++	device domain 6 on
++		ops genoa_pci_domain_ops
++		device pci 00.0 alias s1_gnb_2 on end
++		device pci 00.2 alias s1_iommu_2 off ops amd_iommu_ops end
++		device pci 00.3 alias s1_rcec_2 off end
++
++		device pci 01.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.1 alias s1_gpp_bridge_2_0_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.2 alias s1_gpp_bridge_2_1_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.3 alias s1_gpp_bridge_2_2_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.4 alias s1_gpp_bridge_2_3_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.5 alias s1_gpp_bridge_2_4_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.6 alias s1_gpp_bridge_2_5_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.7 alias s1_gpp_bridge_2_6_a off end
++		end
++
++		device pci 02.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.1 alias s1_gpp_bridge_2_7_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.2 alias s1_gpp_bridge_2_8_a off end
++		end
++
++		device pci 03.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.1 alias s1_gpp_bridge_2_0_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.2 alias s1_gpp_bridge_2_1_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.3 alias s1_gpp_bridge_2_2_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.4 alias s1_gpp_bridge_2_3_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.5 alias s1_gpp_bridge_2_4_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.6 alias s1_gpp_bridge_2_5_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.7 alias s1_gpp_bridge_2_6_b off end
++		end
++
++		device pci 04.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.1 alias s1_gpp_bridge_2_7_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.2 alias s1_gpp_bridge_2_8_b off end
++		end
++
++		device pci 05.0 on end # Dummy device function, do not disable
++
++		device pci 07.0 on end # Dummy device function, do not disable
++		device pci 07.1 alias s1_gpp_bridge_2_a off
++			device pci 0.0 on end # Dummy PCIe function
++			device pci 0.1 off end
++			device pci 0.2 alias s1_primary_NTB_2 off end # Primary PCIe Non-TransparentBridge
++			device pci 0.3 alias s1_secondry_NTB_2 off end # Secondary vNTB
++		end
++	end
++
++	device domain 7 on
++		ops genoa_pci_domain_ops
++		device pci 00.0 alias s1_gnb_3 on end
++		device pci 00.2 alias s1_iommu_3 off ops amd_iommu_ops end
++		device pci 00.3 alias s1_rcec_3 off end
++
++		device pci 01.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.1 alias s1_gpp_bridge_3_0_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.2 alias s1_gpp_bridge_3_1_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.3 alias s1_gpp_bridge_3_2_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.4 alias s1_gpp_bridge_3_3_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.5 alias s1_gpp_bridge_3_4_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.6 alias s1_gpp_bridge_3_5_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 01.7 alias s1_gpp_bridge_3_6_a off end
++		end
++
++		device pci 02.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.1 alias s1_gpp_bridge_3_7_a off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 02.2 alias s1_gpp_bridge_3_8_a off end
++		end
++
++		device pci 03.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.1 alias s1_gpp_bridge_3_0_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.2 alias s1_gpp_bridge_3_1_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.3 alias s1_gpp_bridge_3_2_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.4 alias s1_gpp_bridge_3_3_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.5 alias s1_gpp_bridge_3_4_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.6 alias s1_gpp_bridge_3_5_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 03.7 alias s1_gpp_bridge_3_6_b off end
++		end
++
++		device pci 04.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.1 alias s1_gpp_bridge_3_7_b off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 04.2 alias s1_gpp_bridge_3_8_b off end
++		end
++
++		device pci 05.0 on end # Dummy device function, do not disable
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.1 alias s1_gpp_bridge_3_0_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.2 alias s1_gpp_bridge_3_1_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.3 alias s1_gpp_bridge_3_2_c off end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			device pci 05.4 alias s1_gpp_bridge_3_3_c off end
++		end
++
++		device pci 07.0 on end # Dummy device function, do not disable
++		device pci 07.1 alias s1_gpp_bridge_3_a off
++			device pci 0.0 on end # Dummy PCIe function
++			device pci 0.1 off end #SDXI
++			device pci 0.2 alias s1_primary_NTB_3 off end # Primary PCIe Non-TransparentBridge
++			device pci 0.3 alias s1_secondry_NTB_3 off end # Secondary vNTB
++			device pci 0.4 alias s1_xhci_3 off end # USB
++			device pci 0.5 alias s1_mp0_3 off end # PSP (MP0)
++		end
++
++		device pci 07.2 alias s1_gpp_bridge_3_b off
++			device pci 0.0 alias s1_sata_3_0 off end # first SATA controller; AHCI mode
++			device pci 0.1 alias s1_sata_3_1 off end # second SATA controller; AHCI mode
++		end
++	end
++
+ 	device mmio 0xfedc2000 alias i2c_0 off ops soc_amd_i2c_mmio_ops end
+ 	device mmio 0xfedc3000 alias i2c_1 off ops soc_amd_i2c_mmio_ops end
+ 	device mmio 0xfedc4000 alias i2c_2 off ops soc_amd_i2c_mmio_ops end
+diff --git a/src/soc/amd/genoa_poc/domain.c b/src/soc/amd/genoa_poc/domain.c
+index b6369a47d0..a9e06afe9b 100644
+--- a/src/soc/amd/genoa_poc/domain.c
++++ b/src/soc/amd/genoa_poc/domain.c
+@@ -14,6 +14,7 @@
+ #include <vendorcode/amd/opensil/genoa_poc/opensil.h>
+ 
+ #define IOHC_IOAPIC_BASE_ADDR_LO 0x2f0
++#define MAX_DOMAINS 8
+ 
+ void read_soc_memmap_resources(struct device *domain, unsigned long *idx)
+ {
+@@ -49,11 +50,15 @@ static void genoa_domain_set_resources(struct device *domain)
+ static const char *genoa_domain_acpi_name(const struct device *domain)
+ {
+ 	const unsigned int domain_id = dev_get_domain_id(domain);
+-	const char *domain_acpi_names[4] = {
++	const char *domain_acpi_names[MAX_DOMAINS] = {
+ 		"S0B0",
+ 		"S0B1",
+ 		"S0B2",
+ 		"S0B3",
++		"S1B0",
++		"S1B1",
++		"S1B2",
++		"S1B3",
+ 	};
+ 
+ 	if (domain_id < ARRAY_SIZE(domain_acpi_names))
+diff --git a/src/soc/amd/genoa_poc/root_complex.c b/src/soc/amd/genoa_poc/root_complex.c
+index 3171febe9f..4b5c8d2d11 100644
+--- a/src/soc/amd/genoa_poc/root_complex.c
++++ b/src/soc/amd/genoa_poc/root_complex.c
+@@ -21,6 +21,22 @@ static const struct domain_iohc_info iohc_info[] = {
+ 		.fabric_id = 0x20,
+ 		.misc_smn_base = SMN_IOHC_MISC_BASE_13D1,
+ 	},
++	[4] = {
++		.fabric_id = 0x122,
++		.misc_smn_base = SMN_IOHC_MISC_BASE_13C1,
++	},
++	[5] = {
++		.fabric_id = 0x123,
++		.misc_smn_base = SMN_IOHC_MISC_BASE_13B1,
++	},
++	[6] = {
++		.fabric_id = 0x121,
++		.misc_smn_base = SMN_IOHC_MISC_BASE_13E1,
++	},
++	[7] = {
++		.fabric_id = 0x120,
++		.misc_smn_base = SMN_IOHC_MISC_BASE_13D1,
++	},
+ };
+ 
+ const struct domain_iohc_info *get_iohc_info(size_t *count)
+-- 
+2.34.1
+

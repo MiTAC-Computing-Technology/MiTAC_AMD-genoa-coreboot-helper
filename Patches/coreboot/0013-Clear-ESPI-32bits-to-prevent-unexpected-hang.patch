@@ -1,0 +1,63 @@
+From c6f46220822e0bbe3ec3f3051d6db33526c9f5c7 Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Thu, 28 Nov 2024 15:02:40 +0800
+Subject: [PATCH 13/14] Clear ESPI 32bits to prevent unexpected hang
+
+---
+ src/soc/amd/common/block/include/amdblocks/espi.h |  2 ++
+ src/soc/amd/common/block/lpc/espi_util.c          | 12 ++++++------
+ 2 files changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/src/soc/amd/common/block/include/amdblocks/espi.h b/src/soc/amd/common/block/include/amdblocks/espi.h
+index b7ab06ee55..6e96afc5b1 100644
+--- a/src/soc/amd/common/block/include/amdblocks/espi.h
++++ b/src/soc/amd/common/block/include/amdblocks/espi.h
+@@ -141,6 +141,8 @@ enum cb_err  espi_open_mmio_window(uint32_t base, size_t size);
+  */
+ void espi_update_static_bar(uintptr_t bar);
+ 
++uint32_t espi_read32(unsigned int reg);
++
+ /*
+  * Perform eSPI connection setup to the slave. Currently, this supports slave0 only.
+  */
+diff --git a/src/soc/amd/common/block/lpc/espi_util.c b/src/soc/amd/common/block/lpc/espi_util.c
+index f05575ab74..a7aeab1839 100644
+--- a/src/soc/amd/common/block/lpc/espi_util.c
++++ b/src/soc/amd/common/block/lpc/espi_util.c
+@@ -30,7 +30,7 @@ static uintptr_t espi_get_bar(void)
+ 	return espi_bar;
+ }
+ 
+-static uint32_t espi_read32(unsigned int reg)
++uint32_t espi_read32(unsigned int reg)
+ {
+ 	return read32p(espi_get_bar() + reg);
+ }
+@@ -187,10 +187,11 @@ static void espi_clear_decodes(void)
+ 	unsigned int idx;
+ 
+ 	/* First turn off all enable bits, then zero base, range, and size registers */
+-	if (CONFIG(SOC_AMD_COMMON_BLOCK_ESPI_RETAIN_PORT80_EN))
+-		espi_write16(ESPI_DECODE, (espi_read16(ESPI_DECODE) & ESPI_DECODE_IO_0x80_EN));
+-	else
+-		espi_write16(ESPI_DECODE, 0);
++	if (CONFIG(SOC_AMD_COMMON_BLOCK_ESPI_RETAIN_PORT80_EN)) {
++		espi_write32(ESPI_DECODE, (espi_read32(ESPI_DECODE) & (ESPI_DECODE_IO_0x80_EN)));
++	} else {
++		espi_write32(ESPI_DECODE, 0);
++	}
+ 
+ 	for (idx = 0; idx < ESPI_GENERIC_IO_WIN_COUNT; idx++) {
+ 		espi_write16(espi_io_range_base_reg(idx), 0);
+@@ -995,7 +996,6 @@ enum cb_err espi_setup(void)
+ {
+ 	uint32_t slave_caps, ctrl;
+ 	const struct espi_config *cfg = espi_get_config();
+-
+ 	printk(BIOS_SPEW, "Initializing ESPI.\n");
+ 
+ 	espi_write32(ESPI_GLOBAL_CONTROL_0, ESPI_AL_STOP_EN);
+-- 
+2.34.1
+

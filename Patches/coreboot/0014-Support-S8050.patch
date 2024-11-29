@@ -1,0 +1,1507 @@
+From 8ced1df8b570c927b705297e831b7a70927e7685 Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Thu, 28 Nov 2024 15:36:05 +0800
+Subject: [PATCH 14/14] Support S8050
+
+---
+ configs/config.mitac_s8050                    |  18 ++
+ src/mainboard/mitac/s8050/Kconfig             |  57 +---
+ src/mainboard/mitac/s8050/apcb/convert.sh     |   5 -
+ src/mainboard/mitac/s8050/apcb/data.apcb      | Bin 4096 -> 4096 bytes
+ src/mainboard/mitac/s8050/apcb/data1.apcb     | Bin 4096 -> 4096 bytes
+ src/mainboard/mitac/s8050/apcb/data_rec.apcb  | Bin 13312 -> 20480 bytes
+ src/mainboard/mitac/s8050/apcb/data_rec1.apcb | Bin 968 -> 3256 bytes
+ src/mainboard/mitac/s8050/apcb/data_rec2.apcb | Bin 1184 -> 1184 bytes
+ src/mainboard/mitac/s8050/devicetree.cb       | 256 +++++++++++++++
+ .../mitac/s8050/devicetree_all_pcie.cb        | 251 ---------------
+ .../mitac/s8050/devicetree_all_sata.cb        | 208 ------------
+ .../mitac/s8050/devicetree_sata_g_link.cb     | 192 -----------
+ .../mitac/s8050/devicetree_sata_p_link.cb     | 302 ------------------
+ 13 files changed, 288 insertions(+), 1001 deletions(-)
+ create mode 100644 configs/config.mitac_s8050
+ delete mode 100755 src/mainboard/mitac/s8050/apcb/convert.sh
+ create mode 100644 src/mainboard/mitac/s8050/devicetree.cb
+ delete mode 100644 src/mainboard/mitac/s8050/devicetree_all_pcie.cb
+ delete mode 100644 src/mainboard/mitac/s8050/devicetree_all_sata.cb
+ delete mode 100644 src/mainboard/mitac/s8050/devicetree_sata_g_link.cb
+ delete mode 100644 src/mainboard/mitac/s8050/devicetree_sata_p_link.cb
+
+diff --git a/configs/config.mitac_s8050 b/configs/config.mitac_s8050
+new file mode 100644
+index 0000000000..b4688cd74d
+--- /dev/null
++++ b/configs/config.mitac_s8050
+@@ -0,0 +1,18 @@
++CONFIG_VENDOR_MITAC=y
++CONFIG_MAINBOARD_VENDOR="MiTAC"
++CONFIG_MAINBOARD_PART_NUMBER="S8050"
++CONFIG_BOARD_MITAC_S8050=y
++CONFIG_USE_ASPEED_SIO=y
++
++CONFIG_VGA_BIOS_ID="1a03,2000"
++CONFIG_VGA_BIOS=y
++CONFIG_VGA_BIOS_FILE="src/mainboard/mitac/common/vbios/pci1a03.2000.rom"
++CONFIG_HAVE_VBE_LINEAR_FRAMEBUFFER=y
++CONFIG_VGA_ROM_RUN_DEFAULT=y
++
++CONFIG_PAYLOAD_LINUXBOOT=y
++CONFIG_LINUX_COMMAND_LINE="loglevel=7 earlyprintk=serial,ttyS1,115200 console=ttyS1,115200"
++CONFIG_LINUXBOOT_COMPILE_KERNEL=y
++CONFIG_LINUXBOOT_KERNEL_VERSION="6.7.6"
++CONFIG_LINUXBOOT_KERNEL_CONFIGFILE="x86_64/linuxboot_onyx_defconfig"
++CONFIG_LINUXBOOT_INITRAMFS_PATH="src/mainboard/mitac/s8050/initramfs_u-root.cpio"
+\ No newline at end of file
+diff --git a/src/mainboard/mitac/s8050/Kconfig b/src/mainboard/mitac/s8050/Kconfig
+index 88ec53e4be..cf62053b21 100644
+--- a/src/mainboard/mitac/s8050/Kconfig
++++ b/src/mainboard/mitac/s8050/Kconfig
+@@ -4,33 +4,28 @@ if BOARD_MITAC_S8050
+ 
+ config BOARD_SPECIFIC_OPTIONS
+ 	def_bool y
+-	select BOARD_ROMSIZE_KB_32768
+ 	select SOC_AMD_GENOA_POC
++	select BOARD_ROMSIZE_KB_32768
+ 	select HAVE_ACPI_TABLES
+-	select SOC_AMD_COMMON_BLOCK_HAS_ESPI_ALERT_ENABLE
+ 	select IPMI_KCS
+ 	select IPMI_KCS_ROMSTAGE
+ 	select IPMI_FRU_SMBIOS_ADAPTER
++	select SOC_AMD_COMMON_BLOCK_HAS_ESPI_ALERT_ENABLE
++	select SOC_AMD_COMMON_BLOCK_ESPI_RETAIN_PORT80_EN
+ 
+ config FMDFILE
+-        default "src/mainboard/\$(CONFIG_MAINBOARD_DIR)/board_32MB.fmd" if BOARD_MITAC_S8050 && BOARD_ROMSIZE_KB_32768
+-
+-config MAINBOARD_DIR
+-	default "mitac/s8050"
+-
+-config MAINBOARD_PART_NUMBER
+-	default "S8050"
++	default "src/mainboard/mitac/s8050/board_32MB.fmd"
+ 
+ config USE_ASPEED_SIO
+-        bool "Use the UART on Aspeed Super I/O."
++	bool "Use the UART on Aspeed Super I/O."
+ 
+ config USE_ASPEED_SIO
+-        select SUPERIO_ASPEED_AST2400
+-        select DRIVERS_UART_8250IO
++	select SUPERIO_ASPEED_AST2400
++	#select DRIVERS_UART_8250IO
+ 
+ choice
+ 	prompt "Serial console"
+-	default MITAC_S8050_USE_ONBORAD_UART
++	default MITAC_S8050_USE_BMC_SOL
+ 	help
+ 	  S8050 has provision for get the serial console logs via BMC
+ 	  or on board usb-serial connector. BMC streams the UART console
+@@ -48,40 +43,16 @@ config UART_FOR_CONSOLE
+ 	default 0 if MITAC_S8050_USE_ONBORAD_UART
+ 	default 1 if MITAC_S8050_USE_BMC_SOL
+ 
+-choice
+-	prompt "Backplanes"
+-	default MITAC_S8050_BACKPLANES_ALL_PCIE
+-	help
+-	  The S8050 board has multiple backplanes option. Select the one matching your board.
+-
+-config MITAC_S8050_BACKPLANES_ALL_PCIE
+-	bool "All disks are NVMe drive"
+-
+-config MITAC_S8050_BACKPLANES_PLINK_SATA
+-	bool "SATA lanes on P links"
+-
+-config MITAC_S8050_BACKPLANES_GLINK_SATA
+-	bool "SATA lanes on G links"
+-
+-config MITAC_S8050_BACKPLANES_ALL_SATA
+-	bool "SATA lanes on G and P links"
+-
+-endchoice
+-
+-# Use BMC SOL console on SoC UART1 by default
+-config UART_FOR_CONSOLE
+-	default 1
++config MAINBOARD_DIR
++	default "mitac/s8050"
+ 
+-config DEVICETREE
+-	default "devicetree_all_pcie.cb" if MITAC_S8050_BACKPLANES_ALL_PCIE
+-	default "devicetree_sata_p_link.cb" if MITAC_S8050_BACKPLANES_PLINK_SATA
+-	default "devicetree_sata_g_link.cb" if MITAC_S8050_BACKPLANES_GLINK_SATA
+-	default "devicetree_all_sata.cb" if MITAC_S8050_BACKPLANES_ALL_SATA
++config MAINBOARD_PART_NUMBER
++	default "S8050"
+ 
+ config EFS_SPI_READ_MODE
+-       default 0
++	default 0
+ 
+ config EFS_SPI_SPEED
+-       default 1
++	default 1
+ 
+ endif # BOARD_MITAC_S8050
+diff --git a/src/mainboard/mitac/s8050/apcb/convert.sh b/src/mainboard/mitac/s8050/apcb/convert.sh
+deleted file mode 100755
+index d6ffcbcb27..0000000000
+--- a/src/mainboard/mitac/s8050/apcb/convert.sh
++++ /dev/null
+@@ -1,5 +0,0 @@
+-cp Typex68_0_0_0_ApcbRec.bin data_rec.apcb
+-cp Typex60_0_0_0_Apcb.bin data.apcb
+-cp Typex60_0_1_0_Apcb.bin data1.apcb
+-cp Typex68_0_8_0_ApcbRec.bin data_rec1.apcb
+-cp Typex68_0_9_0_ApcbRec.bin data_rec2.apcb
+diff --git a/src/mainboard/mitac/s8050/apcb/data.apcb b/src/mainboard/mitac/s8050/apcb/data.apcb
+index 3abc1d3e08a1cac3898ba0f085ac22dc473429b7..fd3a35701eec1effacd0eff0f254928bc095208b 100644
+GIT binary patch
+delta 499
+zcmZorXiyMz3~+X8U@&0V!Nb6i&(FY6KT)t+B!Pp0fm!?vLjaHl0s#hw|Nl2G{Li>?
+z!v{E?xS??J0wx~D8<W>Ei3?gVFfuSPa<H%fRhHgf%FZzPE|WRqg~_7K$)Z#1_ZoqW
+z`LX1hDI<_Reo4TYVR9|AJ|pYowan6{2PeBmG6BVxo$rVQsXKJ1D;h-Cgo{^$=)Lvw
+zjUf8T&-7l9ezjorKIX|!nU(7=NzGdhl5rAG+XkY)KMmT$38Y2t|33sWaglH7VM!o;
+zMt1j6AjP00u<R_zg!g5P=h%Vt(N&kOgVZ?%GTj7;FLXP63rI2Cirjt|M62y-cnAst
+zFFDOeAo*=tVb4MIi@CyYfs`Ht_v9BK27{nO-$xLA-SzQDRv`V6wdy-aq4$QQUmy#D
+z4t4xtn4HTZE;Ruup!SHZWOQ+1V7M{=zk(^l<Y_EgzBakVb4-C6T=qF`@?l|Mc&t3{
+z2uR8P`?1$S;`VH%w?X_L{)#U^e4Q+*4<P!cXZcr<xZdJ5-#~l@0~Ur4li#vz=IApw
+P+&sU^{N?5atR2h%He8ln
+
+delta 384
+zcmZorXiyMz3~+X8U@%~Kz{<d|oQZ*9`b5EM5d|QFS^Nxx0FVX(0S1Qu{}(P~n*4x+
+zhtXm3TMlta2L?t4CPoex7NAV&?WOD>WhOJu$nZ}V<uqqZnC#1$%=%-=HB-jPM>+K^
+zLDGv^l|n(PX6gxrgXpeHXCfGZ^s@6Eksy9exOg>)f6O?c8N`3`GrgB_vMZNz{US$?
+zwIC5E@w9Cq`uo$MJ)A&#k#Ff?Ng(~aW!)K&LzM)UoducjzKro4$VR6?rkf!Ct;p?n
+zffR$6oaQ4Cf16g=a}a&q_3=lbuNgkFR(%KY84Q>}UIqC}0OT(aKZAjhAMVjTVk;S4
+zTqe75Yw5b|bKK;^!ocuYdEOBh7X}7<w$j@m`m&nz>;FK*ZhDq~1@RdSSQuVR-pjpt
+Ta|KTa^X3aY1`uNM1)d53NN8ri
+
+diff --git a/src/mainboard/mitac/s8050/apcb/data1.apcb b/src/mainboard/mitac/s8050/apcb/data1.apcb
+index d698594840ee7b856dacb5bab82e31e1c07d131e..ac1528481a4c56c938f0d190f03ba3835192ac93 100644
+GIT binary patch
+delta 26
+hcmZorXiyMz3~+X8U@%}<z{0?g&(FZ{WTW7FegIb)2HpSw
+
+delta 26
+hcmZorXiyMz3~+X8U@%}<z{0?=oQZ*9=SIQz`~X+d2HpSw
+
+diff --git a/src/mainboard/mitac/s8050/apcb/data_rec.apcb b/src/mainboard/mitac/s8050/apcb/data_rec.apcb
+index 2e53b4e4a2e05c0e573e1248ceae0aacd541465b..1cdc7435726f4d75411c4dcc9a17804d864eb7da 100644
+GIT binary patch
+delta 2025
+zcmb7FeN0nV6u-B;e!f>|X{9YKQa}V^g)&?u21aXveJEHoibRY!{KJi*Gblr*@nvC&
+z%L17>|L}(*Xk^O<5z@I3M>YkCV;_9EjeR&_nc2D-W`S(tV$$97fFc@*zU02&J-_q2
+z@0@e*>8-e5Y^Hj**RxS1PSW@cA+JObQgTZFrYtkLvq4Z4t|wk1J$6EZK^2=)84U^y
+z$H}DRz&SBXQzH4frTxA}#eNEQO&;W_JkZ74!KqGyL6w_v`LIL1QQ};hB;T02M3L<Z
+z6CLcsb_|VShLnWJIF24;bIL}|+z2qtVgpkRaZs<>1!WptOo&-RRYkoptTf1Rbv$$m
+z3CzysH_fu_eTGkxm<$jFB?S3IImUA`WiewMA!}P6XL^UY!s?$mXN<TgXSCszrWo^%
+zdpPf<lm{*Io`>s~xP?lV(X{Zh)rM-L0caO?VO`R!*o`&KD8zP_nti!*z?cCx9?c`L
+z=p2?)RV2o<^*B(4=$ykv9K`VDPpG`WpMV*?0F9a~cujDH=Et;Fh|m^6v#yI(%0a3A
+zUD%^9fX%`>7}wW9TLkY*i%`?-*A?Ob%fY@};do4s7A|p%3SUn3v<;XdwQ3D$HL=tQ
+z1w#3PEtj?o4u!7+t=2ThUk%S-y4~6>b9Se8*3N{O@Wq<S@OjPbn#%C?;D~T6e4l;i
+zc*K0X3w-QcyuI2rQlmI!bx*Zl*eszoXN~tfY}TxL><9a}s+70FU5y$zjgDnRH3s&c
+z-HmMCvxsFmGG8{I2Kyp6$ja2v9Jw-bNSUrr*UN~E-6D98sFa{HM)`h^Or}t1)WJ$)
+zzKt`TB{t?`j~$O+9H^sWdomFnE&}_EDX}DsDwUj)T}gA#IU$wI$Y#Pm5d1QK*eSOY
+zZW>pqy=vxWr{eUfS6C@GJze;=&mN_sY79)AlypG4DS`X4I!^&RO*XmzEssFpkjVqx
+zrZRc8Rmh}ZF(<6JKBDvBil}c7=OXSHs?QCA+iZYRvyIB(sCkY2D&&>OpoMYW=9;kY
+zea(<&iK7&XEETqjsoo}B*O>EOGveQlKU)z;qMP1_A&Xc41vBDq7j+<MI)1)`LP~Uk
+zu}We77@3dmACNF(L-{A*jW)_JKiAqtVQ;kcgmEm`BV&?t1xI=<3=RGFu3>Rs$9&qy
+zfW$TY(TDagS9-oeJ6_lN4cd3B>43C*gSQ6J9<r&2(Jvl2Jsf1%UwLu_@$hHYN09H|
+z)BT;C;S0{TQMCI$92sSC;YPHDYsv5Z2?8vw)!pK+Dxg;Dc133I9h6N5Zc6AsW0=4&
+zJoqP&*Si{|Kd_wkx+x5^)~KCE+|=>%e^}1eo|6w4kb>#^NVBt&k#TTa4KY8Q4ceb&
+zgej}ak;@K)D_zTcte{&{=^`ApW+dK=yxfSMtjem>sI1+7@sgL}ZwXD;kZ;cXtB=5>
+z)sXl3*zQqO<S35(jGmb-aelOKthU|>vUK}zUz$kP5aM_>I)MC-FTU{)>Qc|Q{fjnn
+mazum_+d;#F970~Y=-FCJYRS%y)NQQkd_G%&$#*5jsQe$3f!XT-
+
+delta 816
+zcmYL{T}V@57{}jpT-!OZ3(c=;np10=xve98P$>*IA^Q+!Q&Ld6D5Nm0Fq4$pC?N@~
+z<jq`SHcXb8rg1Wd7+C7XwB<*7F>|D}$oxo6M0XLV_nAoN=6C+j|NlPk!+DOyMp-Td
+zB^wQT3*t~qBtrExLTpt~8SM>zb6+avXT^C`l~Ibl%n@A87+AFV;AzIZVI<-gZ1R7D
+zUuJ8>QjWH?lBgUZLBL7Ta?AxX_|ndKJSEG(EwV&>IpQX+Qyj&Qm2%q3V24t{?^3EL
+zcu!SjV23JBMg>q3iD>ge!Um}pt<&oPP13651DK23%{mxT<`7cxxg^h9_KK*DNjM4x
+z;>!5g$Yz&`5lBd9y5griyO9YXdRW@ditu>6K{T+K6^%pG=dndCj|>~TmO@;lKx2OT
+zCJr3~UG%6rmBRh%C`y8VsN+NJLlxQ3_I6=q4)|ryn{z0<M^lEIG!YcS{hIs`tL~u<
+zyz$<yM&NJtFFQV^HL^}3qP^+u2)AluLtps{--4|V&wB^_cDK?Y;J;d#xgo8%cL%8i
+zJJ<RsLQl`fK}h^8fBlK<3B?53T~J@VPJNaT4o9#f1nAz4%n=yQQdsAwv!G%WwDWBD
+z_!dHaI_-vYD_3LOpzSrIZUQv;V15!fk=^Mb5TlbznkfOh_Q`UWmnP@Hnt2+$07rGL
+z<$s`M+KLZAmO!H!0-9pvBC_-Du$NQ{`GQ5}&M+gXr+mnZfmnD_ks9jW5{E`lv?xcz
+z(YS!yZ#Mb1S05ymwQXHif1>`}6F8CY@zers6ILErn%UL?9j9uQJ)pnG*7rf)c6hdb
+zE75l@-f{_KruWkWLqMIl_$&Bd6tX#ijPCSyET~A(eY|89>WCAe3bL`NgaR4#JJDu1
+aU5ZLkR=d^&zt*-@&zT-U;GZR=h5rLCo%_T9
+
+diff --git a/src/mainboard/mitac/s8050/apcb/data_rec1.apcb b/src/mainboard/mitac/s8050/apcb/data_rec1.apcb
+index d033e2795cba4c5ebf7786d413a26b2337c90447..9c6c49cbd7116f90b459131957ea77016d2cb895 100644
+GIT binary patch
+delta 648
+zcmX@XzC%*bF~HfWfx&=b2M+^7K0gCP{Y1fh1s6AW1!i#p21W)3h6D}<24?Xy3;{qI
+z2m}}y{{NroXgx7NXV4&7-VlFpKL!JcgKtdi6&JJsx}AxUgM|g?+S1!g*%>D8HD|mq
+z@oTc^)cU<fAdmc5a?KRvzvGt#oEav^GU_w3PVQxtHa$4mHIfM^zU+KQBuL$%J6+Kr
+zx+Yw_8bt4{mv02oPkyHNg7m8etM@TaKFX+Ee@SZIa*&LZc-l4){rzds9!?-Fa{vD!
+zkco?YOAku|=`*ssj{+$MC4psUK_<K}V?4(Wq>rw;bRDG5DUj(VNPMB&;afn8;a24K
+zyC7O^Ps2k{BzVbbJ_5;a(+YbIqF>AvehZ}Z7`P|D05KQ@9r`|k=<BYJKe7VpkE~VS
+zK?=P$B>e(e5Ok>H55r_%CUL0=NWrv6Y$c<M3j@QA`TrG6877x8X?fV>7SAySYH-=-
+zxXFiwf#I?8ydxkb`|rnI2Z`IWmEH#NfA}lD0P%IQq&|S?o1W!gLE?Ig*L(x<C*NS&
+a!!p0h{N>~s%)nSOU;!l~Q2Yph;s*eXJHB}U
+
+delta 369
+zcmdlXd4gTgF~HfWfx&>`1TzD}MkWRZrip_2ydnPHehdZz42%p63?7r;a)?Vh0NG58
+z94ssh|NocXUdj%XU@)0+MuvZ~D5p7N!en30WY!-`u9-4UKFX<Y36fsSsuT)RHB(P0
+z97K0rIuijhZ`t{dND#j!T)Y~@KW3cJ4B|iencmAd*_BJVevzZcT9Am7c-l4){rzds
+z9!?;=$hY*cB#?gIvhEDfr3^{}%g%yKcwfeN4rHTKAk$3{|5oJoyFiM;OHT6<h`&uM
+z>^X?O?)vy6E0F%kTJ;^oXE0!55CBp@e+hv61>$EgF!IAax<_m!ql?RAH*PHpmwk?#
+zd{`J59xKl~;^M-<V9!>18$@4LlYadlXxL59@~<F1g8>VQnUi;L?_mjYbq<?c!D9db
+DpE6#W
+
+diff --git a/src/mainboard/mitac/s8050/apcb/data_rec2.apcb b/src/mainboard/mitac/s8050/apcb/data_rec2.apcb
+index a4843ecab4015ecac06ee8c9a3db81292d4cfcd2..a95784be8889b250a292399fe795def8cae0fbd4 100644
+GIT binary patch
+delta 26
+hcmZ3$xqws9F~HfWfx&=b0Sf~|K0gD)lZ}G?EC5(O2893s
+
+delta 26
+hcmZ3$xqws9F~HfWfx&=b0Sg1eawZ0bof`%FSpZn~2893s
+
+diff --git a/src/mainboard/mitac/s8050/devicetree.cb b/src/mainboard/mitac/s8050/devicetree.cb
+new file mode 100644
+index 0000000000..5df00022bc
+--- /dev/null
++++ b/src/mainboard/mitac/s8050/devicetree.cb
+@@ -0,0 +1,256 @@
++chip soc/amd/genoa_poc
++
++	# USB configuration
++	register "usb.xhci0_enable" = "1"
++	register "usb.xhci1_enable" = "1"
++	# OC pins
++	register "usb.usb2_oc_pins[0].port0" = "0x0"
++	register "usb.usb2_oc_pins[0].port1" = "0x1"
++	register "usb.usb2_oc_pins[0].port2" = "0x0"
++	register "usb.usb2_oc_pins[0].port3" = "0x1"
++
++	register "usb.usb2_oc_pins[1].port0" = "0x0"
++	register "usb.usb2_oc_pins[1].port1" = "0x1"
++
++	register "usb.usb3_oc_pins[0].port0" = "0x0"
++	register "usb.usb3_oc_pins[0].port1" = "0x1"
++	register "usb.usb3_oc_pins[0].port2" = "0x0"
++	register "usb.usb3_oc_pins[0].port3" = "0x1"
++	register "usb.usb3_oc_pins[1].port0" = "0x0"
++	register "usb.usb3_oc_pins[1].port1" = "0x1"
++
++	register "usb.polarity_cfg_low" = "true"
++
++	register "usb.usb3_force_gen1.port0" = "3"
++	register "usb.usb3_force_gen1.port1" = "3"
++	register "usb.usb3_force_gen1.port2" = "3"
++	register "usb.usb3_force_gen1.port3" = "3"
++
++	# eSPI configuration
++	register "common_config.espi_config" = "{
++		.std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
++		.io_mode = ESPI_IO_MODE_QUAD,
++		.op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
++		.crc_check_enable = 1,
++		.alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
++		.periph_ch_en = 1,
++		.vw_ch_en = 0,
++		.oob_ch_en = 1,
++		.flash_ch_en = 0,
++	}"
++
++	# PHY settings
++	register "usb.usb31_phy_enable" = "1"
++	register "usb.usb31_phy" = "{
++			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++		}"
++
++	device domain 0 on
++		device ref iommu_0 on end
++		device ref rcec_0 on end
++		chip vendorcode/amd/opensil/chip/mpio # P2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "48"
++			register "end_lane" = "63"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_0_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "112"
++			register "end_lane" = "119"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_0_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "120"
++			register "end_lane" = "127"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			register "hotplug" = "ServerExpress"
++			device ref gpp_bridge_0_1_b on end
++		end
++
++		chip vendorcode/amd/opensil/chip/mpio # P4
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "128"
++			register "end_lane" = "131"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_0_0_c on end
++		end
++		device ref gpp_bridge_0_a on
++			device ref xhci_0 on end
++			device ref mp0_0 on end
++		end
++		device ref gpp_bridge_0_b on
++			device ref sata_0_0 on end
++			device ref sata_0_1 on end
++		end
++	end
++
++	device domain 1 on
++		device ref iommu_1 on end
++		device ref rcec_1 on end
++		chip vendorcode/amd/opensil/chip/mpio # P3
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "16"
++			register "end_lane" = "31"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G3
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "80"
++			register "end_lane" = "83"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G3
++			register "type" = "IFTYPE_SATA"
++			register "start_lane" = "84"
++			register "end_lane" = "87"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_1_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G3
++			register "type" = "IFTYPE_SATA"
++			register "start_lane" = "88"
++			register "end_lane" = "91"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_2_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G3
++			register "type" = "IFTYPE_SATA"
++			register "start_lane" = "92"
++			register "end_lane" = "95"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_3_b on end
++		end
++	end
++
++	device domain 2 on
++		device ref iommu_2 on end
++		device ref rcec_2 on end
++		chip vendorcode/amd/opensil/chip/mpio # P1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "32"
++			register "end_lane" = "47"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "64"
++			register "end_lane" = "67"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "68"
++			register "end_lane" = "71"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_1_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "72"
++			register "end_lane" = "75"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_2_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "76"
++			register "end_lane" = "76"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_3_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "77"
++			register "end_lane" = "77"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_4_b on end
++		end
++	end
++
++	device domain 3 on
++		device ref iommu_3 on end
++		device ref rcec_3 on end
++		chip vendorcode/amd/opensil/chip/mpio # P0
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "0"
++			register "end_lane" = "15"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G0
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "96"
++			register "end_lane" = "111"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # P5 - NC
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "132"
++			register "end_lane" = "133"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_c on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # P5 - BMC
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "134"
++			register "end_lane" = "134"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_1_c on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # P5 - NC
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "135"
++			register "end_lane" = "135"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_2_c on end
++		end
++		device ref gpp_bridge_3_a on
++			device ref xhci_3 on end
++			device ref mp0_3 on end
++		end
++		device ref gpp_bridge_3_b on
++			device ref sata_3_0 on end
++			device ref sata_3_1 on end
++		end
++	end
++
++	device ref uart_0 on end
++	device ref uart_1 on end
++
++end
+diff --git a/src/mainboard/mitac/s8050/devicetree_all_pcie.cb b/src/mainboard/mitac/s8050/devicetree_all_pcie.cb
+deleted file mode 100644
+index e25e4d2c89..0000000000
+--- a/src/mainboard/mitac/s8050/devicetree_all_pcie.cb
++++ /dev/null
+@@ -1,251 +0,0 @@
+-chip soc/amd/genoa_poc
+-
+-	# USB configuration
+-	register "usb.xhci0_enable" = "1"
+-	register "usb.xhci1_enable" = "1"
+-	# OC pins
+-	register "usb.usb2_oc_pins[0].port0" = "0x0"
+-	register "usb.usb2_oc_pins[0].port1" = "0x1"
+-	register "usb.usb2_oc_pins[0].port2" = "0x0"
+-	register "usb.usb2_oc_pins[0].port3" = "0x1"
+-
+-	register "usb.usb2_oc_pins[1].port0" = "0x0"
+-	register "usb.usb2_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.usb3_oc_pins[0].port0" = "0x0"
+-	register "usb.usb3_oc_pins[0].port1" = "0x1"
+-	register "usb.usb3_oc_pins[0].port2" = "0x0"
+-	register "usb.usb3_oc_pins[0].port3" = "0x1"
+-	register "usb.usb3_oc_pins[1].port0" = "0x0"
+-	register "usb.usb3_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.polarity_cfg_low" = "true"
+-
+-	register "usb.usb3_force_gen1.port0" = "3"
+-	register "usb.usb3_force_gen1.port1" = "3"
+-	register "usb.usb3_force_gen1.port2" = "3"
+-	register "usb.usb3_force_gen1.port3" = "3"
+-
+-        # eSPI configuration
+-        register "common_config.espi_config" = "{
+-                .std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
+-                .io_mode = ESPI_IO_MODE_QUAD,
+-                .op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
+-                .crc_check_enable = 1,
+-                .alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
+-                .periph_ch_en = 1,
+-                .vw_ch_en = 1,
+-                .oob_ch_en = 1,
+-                .flash_ch_en = 1,
+-        }"
+-
+-	# PHY settings
+-	register "usb.usb31_phy_enable" = "1"
+-	register "usb.usb31_phy" = "{
+-			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-		}"
+-
+-	device domain 0 on
+-		device ref iommu_0 on end
+-		device ref rcec_0 on end
+-
+-		device ref gpp_bridge_0_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P2 - PCIEX32_SLOT_LEFT SLOT3
+-				register "start_lane" = "48"
+-				register "end_lane" = "63"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-
+-		device ref gpp_bridge_0_0_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P4[0..3] - X550
+-				register "start_lane" = "128"
+-				register "end_lane" = "131"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-                device ref lpc_bridge on
+-                        chip drivers/ipmi # BMC KCS
+-                                device pnp ca2.0 on end
+-                        end
+-                end
+-	end
+-
+-	device domain 1 on
+-		device ref iommu_1 on end
+-		device ref rcec_1 on end
+-
+-		device ref gpp_bridge_1_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3 - mciox8_conn2 - nvme4, 20:01.4 ?
+-				register "start_lane" = "16"
+-				register "end_lane" = "19"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3 - mciox8_conn2 - nvme5
+-				register "start_lane" = "20"
+-				register "end_lane" = "23"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_2_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3 - mciox8_conn1 - nvme6 20:01.2 ?
+-				register "start_lane" = "24"
+-				register "end_lane" = "27"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_3_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3 - mciox8_conn1 - nvme7
+-				register "start_lane" = "28"
+-				register "end_lane" = "31"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-
+-		device ref gpp_bridge_1_0_b on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # G3 - mciox8_conn10 - nvme8, 20:03.1
+-				register "start_lane" = "80"
+-				register "end_lane" = "83"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_1_b on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # G3 - mciox8_conn10 - nvme9
+-				register "start_lane" = "84"
+-				register "end_lane" = "87"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_2_b on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # G3 - mciox8_conn9 - nvme10
+-				register "start_lane" = "88"
+-				register "end_lane" = "91"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_3_b on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # G3 - mciox8_conn9 - nvme11
+-				register "start_lane" = "92"
+-				register "end_lane" = "95"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 2 on
+-		device ref iommu_2 on end
+-		device ref rcec_2 on end
+-
+-		device ref gpp_bridge_2_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P1 - PCIEX32_SLOT_LEFT SLOT1
+-				register "start_lane" = "32"
+-				register "end_lane" = "47"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end
+-			end
+-		end
+-
+-	end
+-
+-	device domain 3 on
+-		device ref iommu_3 on end
+-		device ref rcec_3 on end
+-
+-		device ref gpp_bridge_3_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P0 - mcio8_conn3 - nvme0, 60:01.1
+-				register "start_lane" = "0"
+-				register "end_lane" = "3"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P0 - mcio8_conn3 - nvme1
+-				register "start_lane" = "4"
+-				register "end_lane" = "7"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_2_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P0 - mcio8_conn4 - nvme2
+-				register "start_lane" = "8"
+-				register "end_lane" = "11"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_3_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P0 - mcio8_conn4 - nvme3
+-				register "start_lane" = "12"
+-				register "end_lane" = "15"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-
+-		device ref gpp_bridge_3_0_c on # P5[0] - BMC
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "132"
+-				register "end_lane" = "134"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_1_c on # P5[3] - BMC
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "135"
+-				register "end_lane" = "135"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-
+-		device ref gpp_bridge_3_a on
+-			device ref xhci_3 on end
+-			device ref mp0_3 on end
+-		end
+-	end
+-
+-	device ref uart_0 on end
+-	device ref uart_1 on end
+-
+-end
+diff --git a/src/mainboard/mitac/s8050/devicetree_all_sata.cb b/src/mainboard/mitac/s8050/devicetree_all_sata.cb
+deleted file mode 100644
+index a01d6e174f..0000000000
+--- a/src/mainboard/mitac/s8050/devicetree_all_sata.cb
++++ /dev/null
+@@ -1,208 +0,0 @@
+-# SPDX-License-Identifier: GPL-2.0-only
+-
+-chip soc/amd/genoa_poc
+-	# USB configuration
+-	register "usb.xhci0_enable" = "1"
+-	register "usb.xhci1_enable" = "1"
+-	register "usb.xhci2_enable" = "1"
+-	# OC pins
+-	register "usb.usb2_oc_pins[0].port0" = "0x0"
+-	register "usb.usb2_oc_pins[0].port1" = "0x1"
+-	register "usb.usb2_oc_pins[0].port2" = "0x0"
+-	register "usb.usb2_oc_pins[0].port3" = "0x1"
+-
+-	register "usb.usb2_oc_pins[1].port0" = "0x0"
+-	register "usb.usb2_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.usb3_oc_pins[0].port0" = "0x0"
+-	register "usb.usb3_oc_pins[0].port1" = "0x1"
+-	register "usb.usb3_oc_pins[0].port2" = "0x0"
+-	register "usb.usb3_oc_pins[0].port3" = "0x1"
+-	register "usb.usb3_oc_pins[1].port0" = "0x0"
+-	register "usb.usb3_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.polarity_cfg_low" = "true"
+-
+-	register "usb.usb3_force_gen1.port0" = "3"
+-	register "usb.usb3_force_gen1.port1" = "3"
+-	register "usb.usb3_force_gen1.port2" = "3"
+-	register "usb.usb3_force_gen1.port3" = "3"
+-
+-	# eSPI configuration
+-	register "common_config.espi_config" = "{
+-		.std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
+-		.io_mode = ESPI_IO_MODE_QUAD,
+-		.op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
+-		.crc_check_enable = 1,
+-		.alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
+-		.periph_ch_en = 1,
+-		.vw_ch_en = 1,
+-		.oob_ch_en = 1,
+-		.flash_ch_en = 1,
+-	}"
+-
+-	# PHY settings
+-	register "usb.usb31_phy_enable" = "1"
+-	register "usb.usb31_phy" = "{
+-			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-		}"
+-
+-	device domain 0x22 on
+-		device ref gpp_bridge_0_0_a on
+-			chip vendorcode/amd/opensil/mpio # P2
+-				register "start_lane" = "48"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_0_b on
+-			chip vendorcode/amd/opensil/mpio # G2
+-				register "start_lane" = "112"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_0_c on
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "128"
+-				register "n_lanes" = "4"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_b on
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "80"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_0 on end
+-			end
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "88"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_1 on end
+-			end
+-		end
+-		device ref lpc_bridge on
+-			chip drivers/ipmi # BMC KCS
+-				device pnp ca2.0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 0x23 on
+-		device ref gpp_bridge_1_0_a on
+-			chip vendorcode/amd/opensil/mpio # P3
+-				register "start_lane" = "16"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-
+-	device domain 0x21 on
+-		device ref gpp_bridge_2_0_a on
+-			chip vendorcode/amd/opensil/mpio # P1
+-				register "start_lane" = "32"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_1_a on
+-			chip vendorcode/amd/opensil/mpio # P1
+-				register "start_lane" = "40"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_0_b on
+-			chip vendorcode/amd/opensil/mpio # G1 - J4
+-				register "start_lane" = "64"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_1_b on
+-			chip vendorcode/amd/opensil/mpio # G1 - J2
+-				register "start_lane" = "72"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-
+-	device domain 0x20 on
+-		device ref gpp_bridge_3b on
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "0"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_0 on end
+-			end
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "8"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_1 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_0_b on
+-			chip vendorcode/amd/opensil/mpio # G0
+-				register "start_lane" = "96"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_3_0_c on # USB Controller for JUSB1
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "132"
+-				register "n_lanes" = "1"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_3_1_c on # BMC
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "134"
+-				register "n_lanes" = "1"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "bmc" = "1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-end
+diff --git a/src/mainboard/mitac/s8050/devicetree_sata_g_link.cb b/src/mainboard/mitac/s8050/devicetree_sata_g_link.cb
+deleted file mode 100644
+index c9dfba56c2..0000000000
+--- a/src/mainboard/mitac/s8050/devicetree_sata_g_link.cb
++++ /dev/null
+@@ -1,192 +0,0 @@
+-# SPDX-License-Identifier: GPL-2.0-only
+-
+-chip soc/amd/genoa_poc
+-	# USB configuration
+-	register "usb.xhci0_enable" = "1"
+-	register "usb.xhci1_enable" = "1"
+-	register "usb.xhci2_enable" = "1"
+-	# OC pins
+-	register "usb.usb2_oc_pins[0].port0" = "0x0"
+-	register "usb.usb2_oc_pins[0].port1" = "0x1"
+-	register "usb.usb2_oc_pins[0].port2" = "0x0"
+-	register "usb.usb2_oc_pins[0].port3" = "0x1"
+-
+-	register "usb.usb2_oc_pins[1].port0" = "0x0"
+-	register "usb.usb2_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.usb3_oc_pins[0].port0" = "0x0"
+-	register "usb.usb3_oc_pins[0].port1" = "0x1"
+-	register "usb.usb3_oc_pins[0].port2" = "0x0"
+-	register "usb.usb3_oc_pins[0].port3" = "0x1"
+-	register "usb.usb3_oc_pins[1].port0" = "0x0"
+-	register "usb.usb3_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.polarity_cfg_low" = "true"
+-
+-	register "usb.usb3_force_gen1.port0" = "3"
+-	register "usb.usb3_force_gen1.port1" = "3"
+-	register "usb.usb3_force_gen1.port2" = "3"
+-	register "usb.usb3_force_gen1.port3" = "3"
+-
+-	# eSPI configuration
+-	register "common_config.espi_config" = "{
+-		.std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
+-		.io_mode = ESPI_IO_MODE_QUAD,
+-		.op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
+-		.crc_check_enable = 1,
+-		.alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
+-		.periph_ch_en = 1,
+-		.vw_ch_en = 1,
+-		.oob_ch_en = 1,
+-		.flash_ch_en = 1,
+-	}"
+-
+-	# PHY settings
+-	register "usb.usb31_phy_enable" = "1"
+-	register "usb.usb31_phy" = "{
+-			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-		}"
+-
+-	device domain 0x22 on
+-		device ref gpp_bridge_0_0_a on
+-			chip vendorcode/amd/opensil/mpio # P2
+-				register "start_lane" = "48"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_0_b on
+-			chip vendorcode/amd/opensil/mpio # G2
+-				register "start_lane" = "112"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_0_c on
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "128"
+-				register "n_lanes" = "4"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_b on
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "80"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_0 on end
+-			end
+-			chip vendorcode/amd/opensil/mpio
+-				register "type" = "SATA"
+-				register "start_lane" = "88"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				device ref sata_0_1 on end
+-			end
+-		end
+-		device ref lpc_bridge on
+-			chip drivers/ipmi # BMC KCS
+-				device pnp ca2.0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 0x23 on
+-		device ref gpp_bridge_1_0_a on
+-			chip vendorcode/amd/opensil/mpio # P3
+-				register "start_lane" = "16"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-
+-	device domain 0x21 on
+-		device ref gpp_bridge_2_0_a on
+-			chip vendorcode/amd/opensil/mpio # P1
+-				register "start_lane" = "32"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_1_a on
+-			chip vendorcode/amd/opensil/mpio # P1
+-				register "start_lane" = "40"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_0_b on
+-			chip vendorcode/amd/opensil/mpio # G1 - J4
+-				register "start_lane" = "64"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_2_1_b on
+-			chip vendorcode/amd/opensil/mpio # G1 - J2
+-				register "start_lane" = "72"
+-				register "n_lanes" = "8"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-
+-	device domain 0x20 on
+-		device ref gpp_bridge_3_0_b on
+-			chip vendorcode/amd/opensil/mpio # G0
+-				register "start_lane" = "96"
+-				register "n_lanes" = "16"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_3_0_c on # USB Controller for JUSB1
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "132"
+-				register "n_lanes" = "1"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_3_1_c on # BMC
+-			chip vendorcode/amd/opensil/mpio
+-				register "start_lane" = "134"
+-				register "n_lanes" = "1"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "bmc" = "1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-	end
+-end
+diff --git a/src/mainboard/mitac/s8050/devicetree_sata_p_link.cb b/src/mainboard/mitac/s8050/devicetree_sata_p_link.cb
+deleted file mode 100644
+index 2ae1d941c7..0000000000
+--- a/src/mainboard/mitac/s8050/devicetree_sata_p_link.cb
++++ /dev/null
+@@ -1,302 +0,0 @@
+-chip soc/amd/genoa_poc
+-
+-	# USB configuration
+-	register "usb.xhci0_enable" = "1"
+-	register "usb.xhci1_enable" = "1"
+-	# OC pins
+-	register "usb.usb2_oc_pins[0].port0" = "0x0"
+-	register "usb.usb2_oc_pins[0].port1" = "0x1"
+-	register "usb.usb2_oc_pins[0].port2" = "0x0"
+-	register "usb.usb2_oc_pins[0].port3" = "0x1"
+-
+-	register "usb.usb2_oc_pins[1].port0" = "0x0"
+-	register "usb.usb2_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.usb3_oc_pins[0].port0" = "0x0"
+-	register "usb.usb3_oc_pins[0].port1" = "0x1"
+-	register "usb.usb3_oc_pins[0].port2" = "0x0"
+-	register "usb.usb3_oc_pins[0].port3" = "0x1"
+-	register "usb.usb3_oc_pins[1].port0" = "0x0"
+-	register "usb.usb3_oc_pins[1].port1" = "0x1"
+-
+-	register "usb.polarity_cfg_low" = "true"
+-
+-	register "usb.usb3_force_gen1.port0" = "3"
+-	register "usb.usb3_force_gen1.port1" = "3"
+-	register "usb.usb3_force_gen1.port2" = "3"
+-	register "usb.usb3_force_gen1.port3" = "3"
+-
+-        # eSPI configuration
+-        register "common_config.espi_config" = "{
+-                .std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
+-                .io_mode = ESPI_IO_MODE_QUAD,
+-                .op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
+-                .crc_check_enable = 1,
+-                .alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
+-                .periph_ch_en = 1,
+-                .vw_ch_en = 1,
+-                .oob_ch_en = 1,
+-                .flash_ch_en = 1,
+-        }"
+-
+-	# PHY settings
+-	register "usb.usb31_phy_enable" = "1"
+-	register "usb.usb31_phy" = "{
+-			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
+-			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
+-		}"
+-
+-	device domain 0 on
+-		device ref iommu_0 on end
+-		device ref rcec_0 on end
+-		device ref gpp_bridge_0_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P2.L
+-				register "start_lane" = "48"
+-				register "end_lane" = "55"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P2.H
+-				register "start_lane" = "56"
+-				register "end_lane" = "63"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref gpp_bridge_0_0_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "128"
+-				register "end_lane" = "129"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_0_1_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "130"
+-				register "end_lane" = "131"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_0_a on
+-			device ref xhci_0 on end
+-			device ref mp0_0 on end
+-		end
+-                device ref lpc_bridge on
+-                        chip drivers/ipmi # BMC KCS
+-                                device pnp ca2.0 on end
+-                        end
+-                end
+-	end
+-
+-	device domain 1 on
+-		device ref iommu_1 on end
+-		device ref rcec_1 on end
+-		device ref gpp_bridge_1_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3.L
+-				register "start_lane" = "16"
+-				register "end_lane" = "23"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_1_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3.H
+-				register "start_lane" = "24"
+-				register "end_lane" = "31"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 2 on
+-		device ref iommu_2 on end
+-		device ref rcec_2 on end
+-		device ref gpp_bridge_2_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P1.L x8
+-				register "start_lane" = "32"
+-				register "end_lane" = "39"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_2_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P1.H x8
+-				register "start_lane" = "40"
+-				register "end_lane" = "47"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 3 on
+-		device ref iommu_3 on end
+-		device ref rcec_3 on end
+-		device ref gpp_bridge_3_0_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "132"
+-				register "end_lane" = "134"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_1_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "135"
+-				register "end_lane" = "135"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref gpp_bridge_3_a on
+-			device ref xhci_3 on end
+-			device ref mp0_3 on end
+-		end
+-		device ref gpp_bridge_3_b on
+-			device ref sata_3_0 on end
+-			device ref sata_3_1 on end
+-		end
+-	end
+-
+-	device domain 4 on
+-		device ref s1_iommu_0 on end
+-		device ref s1_rcec_0 on end
+-		device ref s1_gpp_bridge_0_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P2.H x8
+-				register "start_lane" = "48"
+-				register "end_lane" = "55"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref s1_gpp_bridge_0_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P2.L x8
+-				register "start_lane" = "56"
+-				register "end_lane" = "63"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end # dummy for configuring mpio
+-			end
+-		end
+-		device ref s1_gpp_bridge_0_0_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "128"
+-				register "end_lane" = "131"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref s1_gpp_bridge_0_a on
+-			device ref s1_xhci_0 on end
+-			device ref s1_mp0_0 on end
+-		end
+-	end
+-
+-	device domain 5 on
+-		device ref s1_iommu_1 on end
+-		device ref s1_rcec_1 on end
+-		device ref s1_gpp_bridge_1_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3.L x8
+-				register "start_lane" = "16"
+-				register "end_lane" = "23"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref s1_gpp_bridge_1_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P3.H x8
+-				register "start_lane" = "24"
+-				register "end_lane" = "31"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 6 on
+-		device ref s1_iommu_2 on end
+-		device ref s1_rcec_2 on end
+-		device ref s1_gpp_bridge_2_0_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P1.L x8
+-				register "start_lane" = "32"
+-				register "end_lane" = "39"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref s1_gpp_bridge_2_1_a on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio # P1.H x8
+-				register "start_lane" = "40"
+-				register "end_lane" = "47"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				register "hotplug" = "ServerExpress"
+-				device generic 0 on end
+-			end
+-		end
+-	end
+-
+-	device domain 7 on
+-		device ref s1_iommu_3 on end
+-		device ref s1_rcec_3 on end
+-		device ref s1_gpp_bridge_3_0_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "132"
+-				register "end_lane" = "133"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref s1_gpp_bridge_3_1_c on
+-			chip vendorcode/amd/opensil/genoa_poc/mpio
+-				register "start_lane" = "134"
+-				register "end_lane" = "135"
+-				register "gpio_group" = "1"
+-				register "aspm" = "L1"
+-				device generic 0 on end
+-			end
+-		end
+-		device ref s1_gpp_bridge_3_a on
+-			device ref s1_xhci_3 on end
+-			device ref s1_mp0_3 on end
+-		end
+-		device ref s1_gpp_bridge_3_b on
+-			device ref s1_sata_3_0 on end
+-			device ref s1_sata_3_1 on end
+-		end
+-	end
+-
+-	device ref uart_0 off end
+-	device ref uart_1 off end
+-
+-end
+-- 
+2.34.1
+

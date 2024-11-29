@@ -1,0 +1,26 @@
+From 20d80ae2af88cab59e98f7809d6001cc18a6cc50 Mon Sep 17 00:00:00 2001
+From: Your Name <you@example.com>
+Date: Fri, 20 Sep 2024 16:18:16 +0800
+Subject: [PATCH 07/14] Remove the initialization for eSPI due to repeatly
+ reboot.
+
+---
+ src/soc/amd/genoa_poc/early_fch.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/soc/amd/genoa_poc/early_fch.c b/src/soc/amd/genoa_poc/early_fch.c
+index 17215f7cd2..ca473bcb8a 100644
+--- a/src/soc/amd/genoa_poc/early_fch.c
++++ b/src/soc/amd/genoa_poc/early_fch.c
+@@ -26,7 +26,7 @@ void fch_pre_init(void)
+ 	if (CONFIG(AMD_SOC_CONSOLE_UART))
+ 		set_uart_config(CONFIG_UART_FOR_CONSOLE);
+ 
+-	configure_espi_with_mb_hook();
++	//configure_espi_with_mb_hook();
+ 
+ 	if (CONFIG(IPMI_KCS_ROMSTAGE)){
+ 		/*
+-- 
+2.34.1
+

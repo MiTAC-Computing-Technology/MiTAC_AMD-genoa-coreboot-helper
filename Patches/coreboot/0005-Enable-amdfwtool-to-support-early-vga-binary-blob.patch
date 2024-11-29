@@ -1,0 +1,72 @@
+From d3ded439abfd4e277f874b1d528b3f833f68eee6 Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 10:05:39 +0800
+Subject: [PATCH 05/14] Enable amdfwtool to support early vga binary blob.
+
+---
+ util/amdfwtool/amdfwtool.c  | 1 +
+ util/amdfwtool/data_parse.c | 4 ++++
+ util/amdfwtool/opts.c       | 6 ++++++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/util/amdfwtool/amdfwtool.c b/util/amdfwtool/amdfwtool.c
+index d96ed87abf..0784f15f5e 100644
+--- a/util/amdfwtool/amdfwtool.c
++++ b/util/amdfwtool/amdfwtool.c
+@@ -360,6 +360,7 @@ amd_bios_entry amd_bios_table[] = {
+ 	{ .type = AMD_BIOS_UCODE, .inst = 6, .level = BDT_LVL2 },
+ 	{ .type = AMD_BIOS_MP2_CFG, .level = BDT_LVL2 },
+ 	{ .type = AMD_BIOS_PSP_SHARED_MEM, .inst = 0, .level = BDT_BOTH },
++	{ .type = AMD_BIOS_EARLY_VGA, .inst = 0, .subpr = 0, .level = BDT_BOTH },
+ 	{ .type = AMD_BIOS_INVALID },
+ };
+ 
+diff --git a/util/amdfwtool/data_parse.c b/util/amdfwtool/data_parse.c
+index 5e06d974b0..9fb70413b2 100644
+--- a/util/amdfwtool/data_parse.c
++++ b/util/amdfwtool/data_parse.c
+@@ -557,6 +557,10 @@ static uint8_t find_register_fw_filename_bios_dir(char *fw_name, char *filename,
+ 		} else {
+ 			fw_type = AMD_BIOS_SKIP;
+ 		}
++	} else if (strcmp(fw_name, "BIOS_EARLY_VGA_FILE") == 0) {
++		fw_type = AMD_BIOS_EARLY_VGA;
++		subprog = 0;
++		instance = 0;
+ 	} else {
+ 		fw_type = AMD_BIOS_INVALID;
+ 	}
+diff --git a/util/amdfwtool/opts.c b/util/amdfwtool/opts.c
+index 62bbc97ae5..758e421394 100644
+--- a/util/amdfwtool/opts.c
++++ b/util/amdfwtool/opts.c
+@@ -61,6 +61,7 @@ enum {
+ 	AMDFW_OPT_SIGNED_OUTPUT,
+ 	AMDFW_OPT_SIGNED_ADDR,
+ 	AMDFW_OPT_BODY_LOCATION,
++	AMDFW_OPT_EARLY_VGA,
+ 	/* begin after ASCII characters */
+ 	LONGOPT_SPI_READ_MODE	= 256,
+ 	LONGOPT_SPI_SPEED	= 257,
+@@ -113,6 +114,7 @@ static struct option long_options[] = {
+ 	{"bios-bin-uncomp",        no_argument, 0, AMDFW_OPT_BIOSBIN_UNCOMP },
+ 	{"bios-sig-size",    required_argument, 0, LONGOPT_BIOS_SIG },
+ 	{"ucode",            required_argument, 0, AMDFW_OPT_UCODE },
++	{"early-vga",        required_argument, 0, AMDFW_OPT_EARLY_VGA },
+ 	{"apob-nv-base",     required_argument, 0, AMDFW_OPT_APOB_NVBASE },
+ 	{"apob-nv-size",     required_argument, 0, AMDFW_OPT_APOB_NVSIZE },
+ 	/* Embedded Firmware Structure items*/
+@@ -560,6 +562,10 @@ int amdfwtool_getopt(int argc, char *argv[], amd_cb_config *cb_config, context *
+ 			if (cb_config->body_location == 0)
+ 				cb_config->body_location = cb_config->efs_location;
+ 			break;
++		case AMDFW_OPT_EARLY_VGA:
++			register_bios_fw_addr(AMD_BIOS_EARLY_VGA, 0, 0, optarg);
++			sub = instance = 0;
++			break;
+ 		case AMDFW_OPT_ANYWHERE:
+ 			any_location = 1;
+ 			break;
+-- 
+2.34.1
+

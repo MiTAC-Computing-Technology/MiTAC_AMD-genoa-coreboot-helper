@@ -1,0 +1,59 @@
+From e00f2482a9d17041572f7af787eeed7f5479ead1 Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 09:46:10 +0800
+Subject: [PATCH 03/14] Enable the support for Aspeed Super I/O and early debug
+
+---
+ src/soc/amd/genoa_poc/early_fch.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/src/soc/amd/genoa_poc/early_fch.c b/src/soc/amd/genoa_poc/early_fch.c
+index d82ebcbcf8..17215f7cd2 100644
+--- a/src/soc/amd/genoa_poc/early_fch.c
++++ b/src/soc/amd/genoa_poc/early_fch.c
+@@ -8,6 +8,8 @@
+ #include <amdblocks/uart.h>
+ #include <soc/southbridge.h>
+ #include <soc/uart.h>
++#include <superio/aspeed/ast2400/ast2400.h>
++#include <superio/aspeed/common/aspeed.h>
+ 
+ /* Before console init */
+ void fch_pre_init(void)
+@@ -25,6 +27,33 @@ void fch_pre_init(void)
+ 		set_uart_config(CONFIG_UART_FOR_CONSOLE);
+ 
+ 	configure_espi_with_mb_hook();
++
++	if (CONFIG(IPMI_KCS_ROMSTAGE)){
++		/*
++		 * IPMI interface might be necessary before ramstage for I/O configuration.
++		 * Assume LPC and KCS interface has initialized by PSP and
++		 * we just only need to maintain I/O port number.
++		 */
++		espi_open_io_window(CONFIG_BMC_KCS_BASE, 4);
++	}
++
++	if (CONFIG(USE_ASPEED_SIO)){
++		uint16_t aspeed_sio_io_port = 0x2E;
++		const uint16_t com1_io_port = 0x3F8;
++		const uint16_t com2_io_port = 0x2F8;
++
++		if (CONFIG(ASPEED_SIO_USE_4E)){
++			aspeed_sio_io_port = 0x4E;
++		}
++
++		espi_open_io_window(aspeed_sio_io_port, 2);
++		espi_open_io_window(com1_io_port, 8);
++		const pnp_devfn_t sio_com1_dev = PNP_DEV(aspeed_sio_io_port, AST2400_SUART1);
++		aspeed_enable_serial(sio_com1_dev, com1_io_port);
++		espi_open_io_window(com2_io_port, 8);
++		const pnp_devfn_t sio_com2_dev = PNP_DEV(aspeed_sio_io_port, AST2400_SUART2);
++		aspeed_enable_serial(sio_com2_dev, com2_io_port);
++	}
+ }
+ 
+ /* After console init */
+-- 
+2.34.1
+

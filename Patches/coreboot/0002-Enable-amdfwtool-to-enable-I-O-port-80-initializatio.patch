@@ -1,0 +1,40 @@
+From 4a23754009b12b2a162c7f1921738b9a116bdb2a Mon Sep 17 00:00:00 2001
+From: Jian-Ming Wang <jian.ming.wang@mitac.com>
+Date: Fri, 20 Sep 2024 09:43:39 +0800
+Subject: [PATCH 02/14] Enable amdfwtool to enable I/O port 80 initialization
+ for BIOS post code.
+
+---
+ util/amdfwtool/amdfwtool.c | 2 ++
+ util/amdfwtool/amdfwtool.h | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/util/amdfwtool/amdfwtool.c b/util/amdfwtool/amdfwtool.c
+index 1fe9923696..d96ed87abf 100644
+--- a/util/amdfwtool/amdfwtool.c
++++ b/util/amdfwtool/amdfwtool.c
+@@ -1520,6 +1520,8 @@ static int set_efs_table(uint8_t soc_id, amd_cb_config *cb_config,
+ 	case PLATFORM_GENOA:
+ 		amd_romsig->spi_readmode_f17_mod_30_3f = cb_config->efs_spi_readmode;
+ 		amd_romsig->spi_fastspeed_f17_mod_30_3f = cb_config->efs_spi_speed;
++		amd_romsig->espi_ctrl0_cfg = 0x0e;
++		amd_romsig->espi_ctrl1_cfg = 0xff;
+ 		switch (cb_config->efs_spi_micron_flag) {
+ 		case 0:
+ 			amd_romsig->micron_detect_f17_mod_30_3f = 0xff;
+diff --git a/util/amdfwtool/amdfwtool.h b/util/amdfwtool/amdfwtool.h
+index b2fd2c0006..ad429dfd40 100644
+--- a/util/amdfwtool/amdfwtool.h
++++ b/util/amdfwtool/amdfwtool.h
+@@ -180,6 +180,8 @@ typedef struct _embedded_firmware {
+ 	uint8_t reserved_4Ah;
+ 	uint8_t reserved_4Bh;
+ 	uint32_t reserved_4Ch;
++	uint8_t espi_ctrl0_cfg;
++	uint8_t espi_ctrl1_cfg;
+ } __attribute__((packed, aligned(16))) embedded_firmware;
+ 
+ typedef struct _psp_directory_header {
+-- 
+2.34.1
+

@@ -1,0 +1,233 @@
+From f54f0252cd4654bee9125a1839d1de843d9f4353 Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Thu, 28 Nov 2024 14:53:49 +0800
+Subject: [PATCH 11/14] Support Capri2
+
+---
+ configs/config.mitac_capri2                 | 11 ++++
+ configs/config.mitac_capri2.prebuild_kernel | 27 ++++++++++
+ src/mainboard/mitac/capri2/Kconfig          | 33 +++++++++++-
+ src/mainboard/mitac/capri2/devicetree.cb    | 60 ++-------------------
+ 4 files changed, 74 insertions(+), 57 deletions(-)
+ create mode 100644 configs/config.mitac_capri2
+ create mode 100644 configs/config.mitac_capri2.prebuild_kernel
+
+diff --git a/configs/config.mitac_capri2 b/configs/config.mitac_capri2
+new file mode 100644
+index 0000000000..26e4f7cb93
+--- /dev/null
++++ b/configs/config.mitac_capri2
+@@ -0,0 +1,11 @@
++CONFIG_VENDOR_MITAC=y
++CONFIG_MAINBOARD_VENDOR="MiTAC"
++CONFIG_MAINBOARD_PART_NUMBER="Capri 2"
++CONFIG_BOARD_MITAC_CAPRI2=y
++CONFIG_USE_ASPEED_SIO=y
++CONFIG_PAYLOAD_LINUXBOOT=y
++CONFIG_LINUX_COMMAND_LINE="earlycon=uart,mmio32,0xfedc9000 earlyprintk=serial,uart0,115200 console=ttyS4,115200"
++CONFIG_LINUXBOOT_COMPILE_KERNEL=y
++CONFIG_LINUXBOOT_KERNEL_VERSION="6.7.6"
++CONFIG_LINUXBOOT_KERNEL_CONFIGFILE="x86_64/linuxboot_onyx_defconfig"
++CONFIG_LINUXBOOT_INITRAMFS_PATH="src/mainboard/mitac/common/u-root/initramfs_u-root.cpio"
+\ No newline at end of file
+diff --git a/configs/config.mitac_capri2.prebuild_kernel b/configs/config.mitac_capri2.prebuild_kernel
+new file mode 100644
+index 0000000000..6e48b8e023
+--- /dev/null
++++ b/configs/config.mitac_capri2.prebuild_kernel
+@@ -0,0 +1,27 @@
++CONFIG_VENDOR_MITAC=y
++CONFIG_MAINBOARD_VENDOR="MiTAC"
++CONFIG_MAINBOARD_PART_NUMBER="Capri 2"
++CONFIG_BOARD_MITAC_CAPRI2=y
++CONFIG_USE_ASPEED_SIO=y
++
++CONFIG_SOC_AMD_COMMON_BLOCK_ESPI_RETAIN_PORT80_EN=y
++
++CONFIG_FRAMEBUFFER_SET_VESA_MODE=y
++CONFIG_FRAMEBUFFER_VESA_MODE=0x113
++CONFIG_FRAMEBUFFER_VESA_MODE_113=y
++CONFIG_FRAMEBUFFER_SET_VESA_MODE=y
++CONFIG_YABEL_PCI_ACCESS_OTHER_DEVICES=y
++CONFIG_YABEL_DIRECTHW=y
++
++CONFIG_VGA_BIOS_ID="1a03,2000"
++CONFIG_VGA_BIOS=y
++CONFIG_VGA_BIOS_FILE="src/mainboard/mitac/common/vbios/pci1a03.2000.uefi.1.13.04.rom"
++CONFIG_HAVE_VBE_LINEAR_FRAMEBUFFER=y
++CONFIG_VGA_ROM_RUN_DEFAULT=y
++
++CONFIG_PAYLOAD_LINUXBOOT=y
++CONFIG_LINUX_COMMAND_LINE="loglevel=7 earlycon=uart,mmio32,0xfedc9000 console=ttyS4,115200"
++CONFIG_LINUXBOOT_KERNEL_PATH="build/Image"
++CONFIG_LINUXBOOT_KERNEL_CONFIGFILE="x86_64/linuxboot_onyx_defconfig"
++CONFIG_PAYLOAD_FILE="payloads/external/LinuxBoot/build/Image"
++CONFIG_LINUXBOOT_INITRAMFS_PATH="src/mainboard/mitac/common/u-root/initramfs_u-root.cpio"
+diff --git a/src/mainboard/mitac/capri2/Kconfig b/src/mainboard/mitac/capri2/Kconfig
+index a907bf6032..7d1a64e12d 100644
+--- a/src/mainboard/mitac/capri2/Kconfig
++++ b/src/mainboard/mitac/capri2/Kconfig
+@@ -8,13 +8,42 @@ config BOARD_SPECIFIC_OPTIONS
+ 	select BOARD_ROMSIZE_KB_32768
+ 	select AMD_SOC_CONSOLE_UART
+ 	select HAVE_ACPI_TABLES
+-	select IPMI_FRU_SMBIOS_ADAPTER
+         select IPMI_KCS 
+         select IPMI_KCS_ROMSTAGE
++	select IPMI_FRU_SMBIOS_ADAPTER
++	select SOC_AMD_COMMON_BLOCK_HAS_ESPI_ALERT_ENABLE
++	select SOC_AMD_COMMON_BLOCK_ESPI_RETAIN_PORT80_EN
+ 
+ config FMDFILE
+ 	default "src/mainboard/mitac/capri2/board.fmd"
+ 
++config USE_ASPEED_SIO
++        bool "Use the UART on Aspeed Super I/O."
++
++config USE_ASPEED_SIO
++        select SUPERIO_ASPEED_AST2400
++        # select DRIVERS_UART_8250IO
++
++choice
++	prompt "Serial console"
++	default MITAC_CAPRI2_USE_ONBORAD_UART
++	help
++	  CAPRI2 has provision for get the serial console logs via BMC
++	  or on board usb-serial connector. BMC streams the UART console
++	  logs via UART1 and UART0 on Super I/O is routed to on board connector.
++
++	config MITAC_CAPRI2_USE_BMC_SOL
++		bool "Use BMC SOL"
++
++	config MITAC_CAPRI2_USE_ONBORAD_UART
++		bool "Use On Board serial"
++endchoice
++
++config UART_FOR_CONSOLE
++	int
++	default 0 if MITAC_CAPRI2_USE_ONBORAD_UART
++	default 1 if MITAC_CAPRI2_USE_BMC_SOL
++
+ 
+ config MAINBOARD_DIR
+ 	default "mitac/capri2"
+@@ -27,7 +56,7 @@ config UART_FOR_CONSOLE
+ 	default 0
+ 
+ config EFS_SPI_READ_MODE
+-       default 0
++       default 2
+ 
+ config EFS_SPI_SPEED
+        default 1
+diff --git a/src/mainboard/mitac/capri2/devicetree.cb b/src/mainboard/mitac/capri2/devicetree.cb
+index e534aa8111..b1dbd5a52f 100644
+--- a/src/mainboard/mitac/capri2/devicetree.cb
++++ b/src/mainboard/mitac/capri2/devicetree.cb
+@@ -35,8 +35,8 @@ chip soc/amd/genoa_poc
+ 		.alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
+ 		.periph_ch_en = 1,
+ 		.vw_ch_en = 1,
+-		.oob_ch_en = 1,
+-		.flash_ch_en = 1,
++		.oob_ch_en = 0,
++		.flash_ch_en = 0,
+ 	}"
+ 
+ 	# PHY settings
+@@ -63,25 +63,8 @@ chip soc/amd/genoa_poc
+ 			register "aspm" = "L1"
+ 			device ref gpp_bridge_0_0_a on end
+ 		end
+-		chip vendorcode/amd/opensil/chip/mpio # G2
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "112"
+-			register "end_lane" = "127"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			register "hotplug" = "ServerExpress"
+-			device ref gpp_bridge_0_0_b on end
+-		end
+-		chip vendorcode/amd/opensil/chip/mpio
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "128"
+-			register "end_lane" = "131"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			device ref gpp_bridge_0_0_c on end
+-		end
+ 		device ref gpp_bridge_0_a on
+-			device ref xhci_0 off end
++			device ref xhci_0 on end
+ 			device ref mp0_0 on end
+ 		end
+ 		device ref gpp_bridge_0_b on
+@@ -101,14 +84,6 @@ chip soc/amd/genoa_poc
+ 			register "aspm" = "L1"
+ 			device ref gpp_bridge_1_0_a on end
+ 		end
+-		chip vendorcode/amd/opensil/chip/mpio # G3
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "80"
+-			register "end_lane" = "95"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			device ref gpp_bridge_1_0_b on end
+-		end
+ 	end
+ 
+ 	device domain 2 on
+@@ -123,14 +98,6 @@ chip soc/amd/genoa_poc
+ 			register "hotplug" = "ServerExpress"
+ 			device ref gpp_bridge_2_0_a on end
+ 		end
+-		chip vendorcode/amd/opensil/chip/mpio # G1
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "64"
+-			register "end_lane" = "79"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			device ref gpp_bridge_2_0_b on end
+-		end
+ 	end
+ 
+ 	device domain 3 on
+@@ -192,33 +159,16 @@ chip soc/amd/genoa_poc
+ 			register "aspm" = "L1"
+ 			device ref gpp_bridge_3_3_b on end
+ 		end
+-		chip vendorcode/amd/opensil/chip/mpio
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "132"
+-			register "end_lane" = "133"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			device ref gpp_bridge_3_0_c on end # WAFL
+-		end
+ 		chip vendorcode/amd/opensil/chip/mpio
+ 			register "type" = "IFTYPE_PCIE"
+ 			register "start_lane" = "134"
+ 			register "end_lane" = "134"
+ 			register "gpio_group" = "1"
+ 			register "aspm" = "L1"
+-			register "bmc" = "1"
+-			device ref gpp_bridge_3_1_c on end # BMC
+-		end
+-		chip vendorcode/amd/opensil/chip/mpio
+-			register "type" = "IFTYPE_PCIE"
+-			register "start_lane" = "135"
+-			register "end_lane" = "135"
+-			register "gpio_group" = "1"
+-			register "aspm" = "L1"
+-			device ref gpp_bridge_3_2_c on end # BMC
++			device ref gpp_bridge_3_0_c on end # BMC
+ 		end
+ 		device ref gpp_bridge_3_a on
+-			device ref xhci_3 off end
++			device ref xhci_3 on end
+ 			device ref mp0_3 on end
+ 		end
+ 		device ref gpp_bridge_3_b on
+-- 
+2.34.1
+

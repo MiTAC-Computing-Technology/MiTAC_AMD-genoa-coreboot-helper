@@ -1,0 +1,607 @@
+From 5e8b27e2ff38ff360cc638a92c266c1a265df377 Mon Sep 17 00:00:00 2001
+From: Your Name <you@example.com>
+Date: Thu, 26 Sep 2024 09:49:37 +0800
+Subject: [PATCH 10/14] Booted to LinuxPayload but hang after boot to Ubuntu.
+
+---
+ src/mainboard/mitac/capri2/Kconfig        |  35 ++++
+ src/mainboard/mitac/capri2/Kconfig.name   |   4 +
+ src/mainboard/mitac/capri2/Makefile.mk    |  11 +
+ src/mainboard/mitac/capri2/board.fmd      |   8 +
+ src/mainboard/mitac/capri2/board_info.txt |   1 +
+ src/mainboard/mitac/capri2/convert.sh     |   5 +
+ src/mainboard/mitac/capri2/data.apcb      | Bin 0 -> 4096 bytes
+ src/mainboard/mitac/capri2/data1.apcb     | Bin 0 -> 4096 bytes
+ src/mainboard/mitac/capri2/data_rec.apcb  | Bin 0 -> 20480 bytes
+ src/mainboard/mitac/capri2/data_rec1.apcb | Bin 0 -> 3256 bytes
+ src/mainboard/mitac/capri2/data_rec2.apcb | Bin 0 -> 1184 bytes
+ src/mainboard/mitac/capri2/devicetree.cb  | 233 ++++++++++++++++++++++
+ src/mainboard/mitac/capri2/dsdt.asl       |  17 ++
+ src/mainboard/mitac/capri2/mainboard.c    |  51 +++++
+ 14 files changed, 365 insertions(+)
+ create mode 100644 src/mainboard/mitac/capri2/Kconfig
+ create mode 100644 src/mainboard/mitac/capri2/Kconfig.name
+ create mode 100644 src/mainboard/mitac/capri2/Makefile.mk
+ create mode 100644 src/mainboard/mitac/capri2/board.fmd
+ create mode 100644 src/mainboard/mitac/capri2/board_info.txt
+ create mode 100755 src/mainboard/mitac/capri2/convert.sh
+ create mode 100644 src/mainboard/mitac/capri2/data.apcb
+ create mode 100644 src/mainboard/mitac/capri2/data1.apcb
+ create mode 100644 src/mainboard/mitac/capri2/data_rec.apcb
+ create mode 100644 src/mainboard/mitac/capri2/data_rec1.apcb
+ create mode 100644 src/mainboard/mitac/capri2/data_rec2.apcb
+ create mode 100644 src/mainboard/mitac/capri2/devicetree.cb
+ create mode 100644 src/mainboard/mitac/capri2/dsdt.asl
+ create mode 100644 src/mainboard/mitac/capri2/mainboard.c
+
+diff --git a/src/mainboard/mitac/capri2/Kconfig b/src/mainboard/mitac/capri2/Kconfig
+new file mode 100644
+index 0000000000..a907bf6032
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/Kconfig
+@@ -0,0 +1,35 @@
++## SPDX-License-Identifier: GPL-2.0-only
++
++if BOARD_MITAC_CAPRI2
++
++config BOARD_SPECIFIC_OPTIONS
++	def_bool y
++	select SOC_AMD_GENOA_POC
++	select BOARD_ROMSIZE_KB_32768
++	select AMD_SOC_CONSOLE_UART
++	select HAVE_ACPI_TABLES
++	select IPMI_FRU_SMBIOS_ADAPTER
++        select IPMI_KCS 
++        select IPMI_KCS_ROMSTAGE
++
++config FMDFILE
++	default "src/mainboard/mitac/capri2/board.fmd"
++
++
++config MAINBOARD_DIR
++	default "mitac/capri2"
++
++config MAINBOARD_PART_NUMBER
++	default "Capri 2"
++
++# Use BMC SOL console on SoC UART0 by default
++config UART_FOR_CONSOLE
++	default 0
++
++config EFS_SPI_READ_MODE
++       default 0
++
++config EFS_SPI_SPEED
++       default 1
++
++endif
+diff --git a/src/mainboard/mitac/capri2/Kconfig.name b/src/mainboard/mitac/capri2/Kconfig.name
+new file mode 100644
+index 0000000000..0f4a6b51ff
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/Kconfig.name
+@@ -0,0 +1,4 @@
++## SPDX-License-Identifier: GPL-2.0-only
++
++config BOARD_MITAC_CAPRI2
++	bool "Capri 2"
+diff --git a/src/mainboard/mitac/capri2/Makefile.mk b/src/mainboard/mitac/capri2/Makefile.mk
+new file mode 100644
+index 0000000000..5ee83d4f12
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/Makefile.mk
+@@ -0,0 +1,11 @@
++## SPDX-License-Identifier: GPL-2.0-only
++
++ifneq ($(wildcard $(src)/mainboard/$(MAINBOARDDIR)/data.apcb),)
++APCB_SOURCES = $(src)/mainboard/$(MAINBOARDDIR)/data.apcb
++APCB_SOURCES1 = $(src)/mainboard/$(MAINBOARDDIR)/data1.apcb
++APCB_SOURCES_RECOVERY = $(src)/mainboard/$(MAINBOARDDIR)/data_rec.apcb
++APCB_SOURCES_RECOVERY1 = $(src)/mainboard/$(MAINBOARDDIR)/data_rec1.apcb
++APCB_SOURCES_RECOVERY2 = $(src)/mainboard/$(MAINBOARDDIR)/data_rec2.apcb
++else
++show_notices:: warn_no_apcb
++endif
+diff --git a/src/mainboard/mitac/capri2/board.fmd b/src/mainboard/mitac/capri2/board.fmd
+new file mode 100644
+index 0000000000..a5118c3ef5
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/board.fmd
+@@ -0,0 +1,8 @@
++FLASH 32M {
++	BIOS 16M {
++		COREBOOT(CBFS)
++		FMAP 4K
++		RW_VPD 8K
++		RO_VPD 8K
++	}
++}
+diff --git a/src/mainboard/mitac/capri2/board_info.txt b/src/mainboard/mitac/capri2/board_info.txt
+new file mode 100644
+index 0000000000..b351b8e696
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/board_info.txt
+@@ -0,0 +1 @@
++Category: eval
+diff --git a/src/mainboard/mitac/capri2/convert.sh b/src/mainboard/mitac/capri2/convert.sh
+new file mode 100755
+index 0000000000..d6ffcbcb27
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/convert.sh
+@@ -0,0 +1,5 @@
++cp Typex68_0_0_0_ApcbRec.bin data_rec.apcb
++cp Typex60_0_0_0_Apcb.bin data.apcb
++cp Typex60_0_1_0_Apcb.bin data1.apcb
++cp Typex68_0_8_0_ApcbRec.bin data_rec1.apcb
++cp Typex68_0_9_0_ApcbRec.bin data_rec2.apcb
+diff --git a/src/mainboard/mitac/capri2/data.apcb b/src/mainboard/mitac/capri2/data.apcb
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd3a35701eec1effacd0eff0f254928bc095208b
+GIT binary patch
+literal 4096
+zcmeH}Ye<t(7{{M?o4LqxsWp`@UP39BE=>#(bQjGsZE1O-3oFQ?kRr8<Md~-vnvq?p
+zG&2>gm?oH&cG1Kv)3BJO#V~U!WM!>15!U%HqSZI)>w7-zcmB_L&U4QDf8W8Q(5RHz
+zB&T`@qCJj8S@idaP$>h5B;-WIX{}2ZOSnx+lFfXoQ>99yP)Dxx5K1M)vCUdBkx<%B
+z8b&rGL>7y6#{cjR@DA_}@DA_}@DA_}Ou>QmYolXH{;R)uC1e}r*2aPaoLC}4f5G$$
+z)_pK7g3jnIvq$;1FQx<F`@qLHz%9=0ec)zIzX>EchX%!_4oA<qKXp1rW6;u2<*`YD
+zfYDT&FTwG~fIw#v<J;5>7bKXUCb)yn4pp9DNnN!!1HD<)Cj;AhzRIw#?DiQs+M?50
+zjjSId8oz1?LVjzPL<K$fWx5*lp_f*M)Yz|ro+daN176C%9P7$>*_^)4j<M9vYXjov
+z{hSiPysq{n)O%PMk&OG6cjhJ|-t;DKBX}fHdKhfXT9^aA|FPpZ@_picb+})reYFnF
+zTEU=6$3S~GjbFg}N7-;WbeDTk1*nv!)PZ9IaShWMU5u6{oOdNAquGtIeg54R2J(`W
+zKg0e{`?(Ihkd~^hZsaM~30@;!64~6tKt0K~-hw_2*?sV5^@7FkuwJ($VGta;<UGPa
+zGYW^SoE@$kh3<~%AB7L2c9~<yi>}@_f%<Vxxswd+{R;khzXCd8^PM!zt>o0q=~u-T
+zk06#V4Na3l2YlJ10K>ecsi6P04+qzX*z-EwIR_n@nsyQS>U)Zti1&LJJwp7xadS7~
+zVbd~tp~u&H4nfOyxqk*<uR8Dzalg{*-=Rq^qR%$>(XQMr$fQi-&gP5pO=lH^I6^B=
+z4M;(Mhj?Ga^{u_jp;zlwabQxlUp(S@54<*k9V1({h;KEdYzG5Jp6mpT^X~5hZ@9*#
+z<M^<zANC`E&dl5#=#$*i6IeG)L={2D2RB#1*D8I2-dd+PMUS{Hcv)?6X7KQ=L$g{C
+tuZ*gH44TD@UVuWw69ZV|7Bm1BnA;|>56>%M`2D}N@Pl`Nci_Jr_z8}iS@i$_
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/mainboard/mitac/capri2/data1.apcb b/src/mainboard/mitac/capri2/data1.apcb
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac1528481a4c56c938f0d190f03ba3835192ac93
+GIT binary patch
+literal 4096
+zcmeIuu?c`M5Cza5NMUENv2_G-0!;{3fs|I_2Cm>J4(A@{VWp*D=l{j!LoN{Bkb~dQ
+zVz<Cr0tcRn!FPZ|1(@Z!66tR%)2+X)KI9?AG}_w1=;KEJVCxx9PfY=cT#bVQ6!@ip
+VFchEw1t>rP3Q&Lo6rjLo0w*S1VnzS}
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/mainboard/mitac/capri2/data_rec.apcb b/src/mainboard/mitac/capri2/data_rec.apcb
+new file mode 100644
+index 0000000000000000000000000000000000000000..1cdc7435726f4d75411c4dcc9a17804d864eb7da
+GIT binary patch
+literal 20480
+zcmeHN3v^7^8s6v3$z(zzL&6}TLzKo!bO;ftN*W;^MLa8A9??{aUZu@LtHB_O)@yks
+zcU4iZq9W0#OG~L&8}EivgmCMTYUxz8!qU#&-#+Ig$4oMlAz`h%&RO>Q&j0U!@BiE1
+z-uvu1a$bt<9AzdZlG%ok(cXl_k%zA?oug=tp41_Pi)U3<YosD%u;Sj;+o;a5FZJru
+zD@HKr2}c`;Jx7ROXiYL<5Mm_6Y9&O+3{J$A3^}rjAy3vY)R1)y1+t!@8`;QE%Zc&s
+zoEWd;#CQ)*jIY6o@ijRXuO~c<*K<6J*YiA!*K2qduNQb0uXp3cc&$c^ch`vVI*l0b
+zp%LS2XvFxM8j+8lh<s{G{Od^keI)+A692jq|9TRCgT%kS#J_>WzoEq6PvWna_}7;B
+z*OB=9Nc?>z{&gk(^(6iViGO{Ge*=ksLy5niW}{$eNAwyt72>>byhd=-y6Ze@)b#YK
+z<*lz>$H%vBJwyEl4gLHZHGYPu^{PJq$Lm8dgpzpWbLye>{_yHoE%`Z7c_joxdlJhY
+zH{v;fQ-I?+t0%=v<PTPZds3g>veSVRDy|m{k?07Q5$B4awOYNc^pp^+R&**DVo5Vr
+zE!J}!N9aGAln}G%r!oCVx*`U*urtFIG1L}l(Mp8^8OZG+)(CbY5o;fw_)?#BxJJZr
+zf{0VxM4Yb`afQ2xR-W~TesBqf{`9nFml5LtMQ||Fg1ol51w#t!hgKO8|NB4aV>VeJ
+z9;?g;9Z$Fu!t(-`M(@$5d?8m;S~}8#`FK|<u;E8hUi1hjD5#fX&<?&}sYFl=qs2%I
+z{K$u*;K8R!J__t|g@=W<s1hCmU#f?4?DDwbll}5ot3?liFV#cNhk2+h4@;HlQMNvm
+zJTP|H<@u^d520K=o+OV<9rla;`Y=iJB6Gn!DSfW$fpzR?zeqgn^ibxM=SAsL^03ex
+z&i0El9`PPj5BdO3qkSo#AJnwFpb7LrQSv~bGah(`$a-Kr^wIm!^F!iMst2vE@TyK8
+z&()y3c+O4_aF)kj9x-QnK%ZDzfI}s8q=&@AP7hajSfo72DRX}$9)i6d$~mCj+g+~c
+zVSBz{jJE58=^=1-dOQstJY67Zl%uo#qMR#ddZ0d*7FX5><zc4>?ZWP=h=+wnBA;@7
+zxWWU!M<O-mAliiyzfnqm2MA@)6U+|^a$yZ(jOF=U(Z_bZ7-^pv1Lgxo!J|~4@^Y5v
+zt7;w<oj1?{xs;kHeU5m@aX^e4dI06;iBYnZdQ^1Y$bD6YhehgFUN3T6S9rK`-XNce
+z7I1T<hg`4ZQI+RSb@34Q&)iDyAB+!0xo&0O<LG0geY&!L<eX1}hok)i9=7XN_Bql6
+zF{lSt#r~0V0-*^|_9=N-q<l|u|3Dvkf6&{~3mjw~ay>Z9dQ|oPsSY04KP6go7Nu=;
+zbpBvm&>kFcFVB(Er<^Am!gQ#tK1L~C`MhQC<wDu}PI)=Y^Hntu+x>(7QJ@3RBw=|z
+zT2*>ETQ8`0<@|XR9+<Dk<>Bi2Bd;0oRbI|`RLB02=d3DuRM-2Cyq=)b(|q4?l?T=b
+zeI2&@eUG&#uLY(4^1Y+=5lw@XJg_#Ltq<var%HK%|0D9?(`Z{f-{k9Q=%K!MiF1H+
+zZ@kugjLwD8(Yc57MLAEfZGDc`t+Vw)le6csvvbcj=ab-Jd+y=ciM&9JS>DUGK1X`U
+zZGm{MVGjdcIrkoghegVRTrzLlee8^fE9ai93DA)qCaGSjhqLFJ#KZ1+Lc6lNs*{JK
+zb5EWlJ3`dqOb^V1tjFV?dzIy3p*fLPULPju-en%;oO{YSpxxSCuIS;yxo5XNo(2zB
+z&Kr5IoaupjSLel*|K}@@hlS>}T_3LSz<Fch(_K1m@SMV&p&&nO6i52V^|C&;>%~ah
+zV;ruWH&2R(?RkT7BR9r^F`H;9&*w-Fv{BB}qntP8<t)#q<YA$C9jzB<JOsl$_IGXC
+zjS;_3=wIa7oY7uuw65K{wrF7%MVl|JkM}@5Y;l%ln<qT=;IG|cz1%`qYSX`B(R$Gq
+z4D(4O!bw?vvA?o>58G&qBIXke3m=icZU46X%WP4Dvhj%dMO!c|dQAR{D`+q0x7YV!
+z{gzbFzT)vc%zp*(hx(HK=40ucIqNxM4vHjQJ9mrGO5Y7GpaEI~XEY;Ho-2I3!9yJl
+z=k6}J)6W~EYn5j!Qo@&L)_WH5MdBB2a#bbpI{jS4HVi5Z=+m<|F^S(X#?p5`Y*Z6n
+z3OuJX3UuunclTkRlbCBC(;&X+^LPR1*<?1OmU4bAL;p@Op776}@Ul0sZRQbw;MAdk
+z0Tf8y_@mFm&dOfb8utCw8#}_zKfImcZ|h4Kj`CR875=0?&vrvxOottVfQNE};^6=3
+z+S|i`@jv*!4*#(m<43~oey`pr;G*=_3=f3+jDh_(d1DL(^3B+j{{q(ibm}<ZLUYvH
+zz%XNIGU8e`x-tQncl+7|_-B4QA`SM=PeLaF6BFN=3M?+}Jp=gaM@wb`_eSoTMS*NB
+zNS_ZpwXor0pf16%6!mHIdS}2swIOslaAGdLT_oh5|FTuEi~K&J-&#`5H!jVBeI?|3
+zh6CM(?SOyPj4fZoe{l7yyMXP_Z#oFfotAzY=sE7p8DJA@NCDzKYF)etdzjCW%fJ^y
+z=Uf98oGiSC`X)X2>#+A<?u*A9Ikfx(h8F$A+pq)f@OOZ>=A`}!?A!M1yJ#0_X?GuX
+z`&)|{mT>3)fuEQ-k|UI@mko0s(A7idW9|tzH;M^wbkJh49!l+^#R81zKVAnk#;wu8
+zf5J1zgEl8c(>mkNR^(dlM|vGak4qWsv(3UbAwH;2=n&zHc7<-51{BDM3s)K;(bfAu
+zHD(D1XpG?F<GHa3a7EyqrWDAh+j7|Y3k->A){@#k>XtV{KSEwsAo3J6yNtg-ki2un
+zL0HIZcPur*zhug;Ht45h&FOZ);-$CRp<Sw<XBh0vgvK2(zJbB-z5xH<0mTe+(@YVt
+zzsuKmra<bQN{$8&Ix#mI{^sNqv+tb?je$RWi+gvVmY>`U=vUCHH~L?BC%G^B|2X=q
+z{%H4F>d*lc$ZEHy1A+f;Rp%AphxtbaBmUb(UE-j_y5qCr5I^m$xkD(BYaTNbVDI@N
+zc_j2sI*`He)z|(=gx~-9lW)QwcKl_wKNdfTO2YVe&h$v3K*k<!kqT@Rn(!XtQl5G7
+zec;;Q!;|3OHRTz$FMNs{P6v;JA@S4UKb^ah;k~4h>Gbn#GQrFD1Jrw`1k6PHQ~BH2
+z{`n=i<{a>D-oM2>)So%mlVQtUtLK5A*6$$0z!^K{=TN)DsDdRF$f0Kom!jP&fzJTn
+z3pYBleYSP&CiWTj_#q`9Bd(|Sd&`jT&D;Cf{>zM5uoC`TLBFg6<~Lma8PMmI&7UFP
+z?g6RmfdiMOu7{rs@38^xyDzz(1^=33T{k1&9j_^yVf)_8-3;D!dTwX-xbU&r-&4EE
+zmA;@$43k#ppuSVqwjA^mVt#!K+CA&Ncnkc6W7BgfkR)yWt-#Oky~QvjJYgH`C_^H{
+z!kKfoqup1X)@?_-yI1?|ME!#?J$9krB?(D;;P)-G?q$04O4)~v;*)oGKm11;eSLre
+zX)^En0oWJz>^%&-seav2*uST8$FTm%@r%b{pYZqi0jBw_Wj`Qq-q>0Bz~pbf%ZER2
+z_|6}(KD(JVvFFc$jrnJgH>xjx7VV4QZh98=>oW4sQXrpp-FFUnF77`UfITh2m(XAH
+zo#xBXvq$5=|H8km<)G_m|HaRL7ok6G*uG!k|HD$iu;>$?o2ak3sOTpAwIk=Tk18Xw
+z(r=@`U|+9dV9%V_?xTIby|W%rAiaw3!Oaf0OBCeuZD+j=Tr}O0KdrDD+fl!vV^R=o
+zVMs8JLGt^>+pWzMhwlC*Y&gX>x5vGNdi}QReRTrezq%Q5_?U6Qyw;<E5dns=sJ~n1
+zt4v_Wu}RC&@5F)GU&d1WIbivI_*aJAVDmA3^yH&BnRi`2bR4+5aOfGtM`%;dBd(-R
+zlOotBoBREW{`0PUc@yvML1P+P;6K}a!k>t1wR+QEu!%_^W*R4tFFxi?ej=GjxQvf<
+zINSHn-r<F?Df7d<;g4E;)c`c5B^v2Z1gl$%3jwG<I&5n*+6{T$vwsV;>sTYBt%c^z
+z{_cER#J@l3;}>bQKDpndP7fmJ{AG9U2mj!lR_sI1O$mu{=<mZlO^2ZUv6~~}Q9t5z
+z;z(e~%|oMrh5ozW0cO?jmyEm-#lNK@{^o{06RCOW!07nNw3{h)y=F~C{X#By0phzH
+zAH48&YWHuy?=$e+m^~<)^}8Z58*!7PXKz9NQyD4W=vxp{>%CeBP#>9Caxj`+8@g@(
+z9`^9RrXRuibw}6iB<xx@G^gkrn^klA&}rC#C&Jl!ePO@HMfA6&LA$H)@2<P!FXWkj
+zCy$+nle`A8b%q%AQWa1YP!&)WP!&)WP!&)WP!&)WP!&)WP!&)WP!&)WP!&)WP!&)W
+YP!&)WP!&)WP!&)WP!&)WsJsII1E>Q{mjD0&
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/mainboard/mitac/capri2/data_rec1.apcb b/src/mainboard/mitac/capri2/data_rec1.apcb
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c6c49cbd7116f90b459131957ea77016d2cb895
+GIT binary patch
+literal 3256
+zcmeH}Ye<t(7{{M?&P!yvw46#8Zy3eWrHK)Nx_QmiIm-)WXpluAMma5u%x|JKqkB|d
+zG8HYE7MPW0Y2u}&VKVQCd50`5E0bWI{~}s_^ZVWp`<?&)Jm)#*ea<_0{A5zeITBN?
+zIZ=uwQ6~NS1V|+wL;|uR;u3UITCJ~MNUYv?sY8iW=I0+6<X|Ke5XTlLm=PHX)g)tN
+zkAO(4)r|~4h6)%eV5oqh0)`40DqyI<5-PAeA~c-Dzx#_`BeqbiYb=PznF;vlFPPrO
+zx(}xL(29W)Q>1VEJdqBLdA3%9`>oX@V7zQ}0wghq21PFqM{l{mc{=98(9%%(`JX%<
+z<HVy}0k$9Z@U-SL4kasAAz=P>v^{8TUf~E9)l@k%(4fnR2yE;BBEq_oC)dPii>_wY
+zvwn<d;hx3|@hx2fDYQ*@sz2yT-8ycsHVuI`;hhZw@8lMS+cFl;r$!nx78^V5fq&D@
+zDhAByQpY0S%gX_AIB#iZb{zc1!JNI|nHb?|us(Br7C83f&;`W1Mr}~ye4VCMN;GSE
+zlM_k?I<{}&7Un;Src0r_?DNY&i7=@K{5~$PTgJF*SlfvG?uIFv>=@N+pEWa(lc4ks
+z)_+RlI&dM)6<s}ulSK0R;1>lp^)pa^+~Xn8weH*q>a%m*#`l=7*%UnqPTjGdVW8!g
+zr*vHDtDJ-G2^gJ29p;QPz9TNQ>cArM%Nw(QGO+vQ{dd1Sx~TV^)Y+7C{;bly1zHC$
+z7B1XzLImycImHk3aTX?n?)N{O+{I__YxVR7^p4~cw-N9E-0va$QRn<u@EeBXd*J(+
+zC<dSxA{?inMMvys!M>36ukhW9AAEx*F`s7j&XW*yl$Svn#9hxd!#ACox7`w2a%Efy
+zx|>IBfUjy9*b2Q<C6$A*Rc=x6b6z;@13P9C6W}Lmk`98NGwp}L;WZ7%!Ae_sDz^9e
+z@*xfJt5;-aL0{rFU&Op-F*qMO%Dbryb*)fEt8{q^l2q`O-di3OWOz?ooU&+!UmjfB
+g3eKCkyaSCi?HaJ!&TAaZn{QjhI=rud;m`l}7rjFj5C8xG
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/mainboard/mitac/capri2/data_rec2.apcb b/src/mainboard/mitac/capri2/data_rec2.apcb
+new file mode 100644
+index 0000000000000000000000000000000000000000..a95784be8889b250a292399fe795def8cae0fbd4
+GIT binary patch
+literal 1184
+zcmZ<^aCT~7Fko1~!oZNv&%p460TsA9I~g%B2rvjSFfb;7rT+hSKvEKc#3q&L<Q(AW
+r>+0*yA}+wd2-K_qbOVcc9D@Lm1_BNShX4P;tWjb#1V%$(M1}wWa?1??
+
+literal 0
+HcmV?d00001
+
+diff --git a/src/mainboard/mitac/capri2/devicetree.cb b/src/mainboard/mitac/capri2/devicetree.cb
+new file mode 100644
+index 0000000000..e534aa8111
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/devicetree.cb
+@@ -0,0 +1,233 @@
++chip soc/amd/genoa_poc
++
++	# USB configuration
++	register "usb.xhci0_enable" = "1"
++	register "usb.xhci1_enable" = "1"
++	# OC pins
++	register "usb.usb2_oc_pins[0].port0" = "0x0"
++	register "usb.usb2_oc_pins[0].port1" = "0x1"
++	register "usb.usb2_oc_pins[0].port2" = "0x0"
++	register "usb.usb2_oc_pins[0].port3" = "0x1"
++
++	register "usb.usb2_oc_pins[1].port0" = "0x0"
++	register "usb.usb2_oc_pins[1].port1" = "0x1"
++
++	register "usb.usb3_oc_pins[0].port0" = "0x0"
++	register "usb.usb3_oc_pins[0].port1" = "0x1"
++	register "usb.usb3_oc_pins[0].port2" = "0x0"
++	register "usb.usb3_oc_pins[0].port3" = "0x1"
++	register "usb.usb3_oc_pins[1].port0" = "0x0"
++	register "usb.usb3_oc_pins[1].port1" = "0x1"
++
++	register "usb.polarity_cfg_low" = "true"
++
++	register "usb.usb3_force_gen1.port0" = "3"
++	register "usb.usb3_force_gen1.port1" = "3"
++	register "usb.usb3_force_gen1.port2" = "3"
++	register "usb.usb3_force_gen1.port3" = "3"
++
++	# eSPI configuration
++	register "common_config.espi_config" = "{
++		.std_io_decode_bitmap = ESPI_DECODE_IO_0x80_EN,
++		.io_mode = ESPI_IO_MODE_QUAD,
++		.op_freq_mhz = ESPI_OP_FREQ_16_MHZ,
++		.crc_check_enable = 1,
++		.alert_pin = ESPI_ALERT_PIN_PUSH_PULL,
++		.periph_ch_en = 1,
++		.vw_ch_en = 1,
++		.oob_ch_en = 1,
++		.flash_ch_en = 1,
++	}"
++
++	# PHY settings
++	register "usb.usb31_phy_enable" = "1"
++	register "usb.usb31_phy" = "{
++			{0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05, 0x00},
++			{0x05, 0x01, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++			{0x00, 0x05, 0x07, 0x00, 0x00, 0x07, 0x01, 0x05, 0x00, 0x05, 0x00, 0x05},
++		}"
++
++	device domain 0 on
++		device ref iommu_0 on end
++		device ref rcec_0 on end
++		chip vendorcode/amd/opensil/chip/mpio # P2 - CN2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "48"
++			register "end_lane" = "63"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_0_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "112"
++			register "end_lane" = "127"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			register "hotplug" = "ServerExpress"
++			device ref gpp_bridge_0_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "128"
++			register "end_lane" = "131"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_0_0_c on end
++		end
++		device ref gpp_bridge_0_a on
++			device ref xhci_0 off end
++			device ref mp0_0 on end
++		end
++		device ref gpp_bridge_0_b on
++			device ref sata_0_0 on end
++			device ref sata_0_1 on end
++		end
++	end
++
++	device domain 1 on
++		device ref iommu_1 on end
++		device ref rcec_1 on end
++		chip vendorcode/amd/opensil/chip/mpio # P3 - OCP3.0
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "16"
++			register "end_lane" = "31"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G3
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "80"
++			register "end_lane" = "95"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_1_0_b on end
++		end
++	end
++
++	device domain 2 on
++		device ref iommu_2 on end
++		device ref rcec_2 on end
++		chip vendorcode/amd/opensil/chip/mpio # P1 - CN1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "32"
++			register "end_lane" = "47"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			register "hotplug" = "ServerExpress"
++			device ref gpp_bridge_2_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "64"
++			register "end_lane" = "79"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_2_0_b on end
++		end
++	end
++
++	device domain 3 on
++		device ref iommu_3 on end
++		device ref rcec_3 on end
++		chip vendorcode/amd/opensil/chip/mpio # P0 - CN5
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "0"
++			register "end_lane" = "7"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # P0 - M.2_0
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "8"
++			register "end_lane" = "11"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_1_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # P0 - M.2_1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "12"
++			register "end_lane" = "15"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_2_a on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G0 - CN3_E1.S_0
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "96"
++			register "end_lane" = "99"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G0 - CN3_E1.S_1
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "100"
++			register "end_lane" = "103"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_1_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G0 - CN3_E1.S_2
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "104"
++			register "end_lane" = "107"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_2_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio # G0 - CN3_E1.S_3
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "108"
++			register "end_lane" = "111"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_3_b on end
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "132"
++			register "end_lane" = "133"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_0_c on end # WAFL
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "134"
++			register "end_lane" = "134"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			register "bmc" = "1"
++			device ref gpp_bridge_3_1_c on end # BMC
++		end
++		chip vendorcode/amd/opensil/chip/mpio
++			register "type" = "IFTYPE_PCIE"
++			register "start_lane" = "135"
++			register "end_lane" = "135"
++			register "gpio_group" = "1"
++			register "aspm" = "L1"
++			device ref gpp_bridge_3_2_c on end # BMC
++		end
++		device ref gpp_bridge_3_a on
++			device ref xhci_3 off end
++			device ref mp0_3 on end
++		end
++		device ref gpp_bridge_3_b on
++			device ref sata_3_0 on end
++			device ref sata_3_1 on end
++		end
++	end
++
++	device ref uart_0 on end
++	device ref uart_1 on end
++
++end
+diff --git a/src/mainboard/mitac/capri2/dsdt.asl b/src/mainboard/mitac/capri2/dsdt.asl
+new file mode 100644
+index 0000000000..caaf131732
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/dsdt.asl
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++
++/* DefinitionBlock Statement */
++#include <acpi/acpi.h>
++DefinitionBlock (
++	"dsdt.aml",
++	"DSDT",
++	ACPI_DSDT_REV_2,
++	OEM_ID,
++	ACPI_TABLE_CREATOR,
++	0x00010001	/* OEM Revision */
++)
++{	/* Start of ASL file */
++	#include <acpi/dsdt_top.asl>
++
++	#include <soc.asl>
++} /* End of ASL file */
+diff --git a/src/mainboard/mitac/capri2/mainboard.c b/src/mainboard/mitac/capri2/mainboard.c
+new file mode 100644
+index 0000000000..bc181ce395
+--- /dev/null
++++ b/src/mainboard/mitac/capri2/mainboard.c
+@@ -0,0 +1,51 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++
++#include <amdblocks/acpi.h>
++#include <soc/amd_pci_int_defs.h>
++#include <amdblocks/amd_pci_util.h>
++#include <types.h>
++
++/* The IRQ mapping in fch_irq_map ends up getting written to the indirect address space that is
++   accessed via I/O ports 0xc00/0xc01. */
++
++/*
++ * This controls the device -> IRQ routing.
++ *
++ * Hardcoded IRQs:
++ *  0: timer < soc/amd/common/acpi/lpc.asl
++ *  1: i8042 - Keyboard
++ *  2: cascade
++ *  8: rtc0 <- soc/amd/common/acpi/lpc.asl
++ *  9: acpi <- soc/amd/common/acpi/lpc.asl
++ */
++static const struct fch_irq_routing fch_irq_map[] = {
++	{ PIRQ_A,	12,		PIRQ_NC },
++	{ PIRQ_B,	14,		PIRQ_NC },
++	{ PIRQ_C,	15,		PIRQ_NC },
++	{ PIRQ_D,	12,		PIRQ_NC },
++	{ PIRQ_E,	14,		PIRQ_NC },
++	{ PIRQ_F,	15,		PIRQ_NC },
++	{ PIRQ_G,	12,		PIRQ_NC },
++	{ PIRQ_H,	14,		PIRQ_NC },
++
++	{ PIRQ_SCI,	ACPI_SCI_IRQ,	ACPI_SCI_IRQ },
++	{ PIRQ_GPIO,	11,		11 },
++	{ PIRQ_I2C0,	10,		10 },
++	{ PIRQ_I2C1,	 7,		 7 },
++	{ PIRQ_I2C2,	 6,		 6 },
++	{ PIRQ_I2C3,	 5,		 5 },
++	{ PIRQ_UART0,	 4,		 4 },
++	{ PIRQ_UART1,	 3,		 3 },
++
++	/* The MISC registers are not interrupt numbers */
++	{ PIRQ_MISC,	0xfa,		0x00 },
++	{ PIRQ_MISC0,	0x91,		0x00 },
++	{ PIRQ_HPET_L,	0x00,		0x00 },
++	{ PIRQ_HPET_H,	0x00,		0x00 },
++};
++
++const struct fch_irq_routing *mb_get_fch_irq_mapping(size_t *length)
++{
++	*length = ARRAY_SIZE(fch_irq_map);
++	return fch_irq_map;
++}
+-- 
+2.34.1
+
