@@ -19,14 +19,17 @@
 
 1. cd coreboot
 2. Execute "make crossgcc-x64 -j 4 CPUS=4" to compile related utilities
-3. Execute "make defconfig KBUILD_DEFCONFIG=configs/config.mitac_s8050" 
-4. Execute "make" to build coreboot
-5. Deploy build/coreboot.rom to 32MB SPI flash of S8050
+3. Execute "make defconfig" to configure platform settings
+  - For S8050: make defconfig KBUILD_DEFCONFIG=configs/config.mitac_s8050
+  - For Capri2: make defconfig KBUILD_DEFCONFIG=configs/config.mitac_capri2.prebuild_kernel
+  - For B8261: make defconfig KBUILD_DEFCONFIG=configs/config.mitac_s8261
+5. Execute "make" to build coreboot
+6. Deploy build/coreboot.rom to 32MB SPI flash of platforms
 
 
 ## Progress
 
-- With these repositories, S8050 + Genoa can boot to OS(Ubuntu) successfully
+- With these repositories, MiTAC platforms + Genoa can boot to OS(Ubuntu) successfully
 - Support USB and NVME devices
 - Debug messages are available through BMC SOL
 
