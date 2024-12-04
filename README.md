@@ -1,7 +1,10 @@
-# S8050-genoa-coreboot-helper
+# MiTAC_AMD-genoa-coreboot-helper
 
 1. This is source code setup repository for MiTAC S8050 of Genoa/OpenSIL/coreboot.
-2. Supported platform: S8050GM4NE-2T (https://www.mitaccomputing.com/Motherboards_S8050_S8050GM4NE-2T_EN~Spec)
+2. Supported platform:
+   - MiTAC_Tyan S8050GM4NE-2T (https://www.mitaccomputing.com/Motherboards_S8050_S8050GM4NE-2T_EN~Spec)
+   - Capri2 (https://www.mitaccomputing.com/OCPserver_CP2S11_CP2S11-U_EN~description#ov)
+   - MiTAC_Tyan B8261T85E24HR-2T (https://www.mitaccomputing.com/Barebones_TN85B8261_B8261T85E24HR-2T_EN~description) 
 
 
 ## Clone Repositories
