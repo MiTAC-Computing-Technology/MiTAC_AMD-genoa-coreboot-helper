@@ -1,0 +1,23 @@
+From 680d81aa1938036d42321ad76c40abdf8d97eb9c Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Fri, 3 Jan 2025 11:53:51 +0800
+Subject: [PATCH] Workaround: Prevent Capri2 hang before u-root
+
+---
+ src/soc/amd/genoa_poc/early_fch.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/soc/amd/genoa_poc/early_fch.c b/src/soc/amd/genoa_poc/early_fch.c
+index ca473bcb8a..701a318363 100644
+--- a/src/soc/amd/genoa_poc/early_fch.c
++++ b/src/soc/amd/genoa_poc/early_fch.c
+@@ -59,4 +59,6 @@ void fch_pre_init(void)
+ /* After console init */
+ void fch_early_init(void)
+ {
++	if (CONFIG(BOARD_MITAC_CAPRI2))
++		configure_espi_with_mb_hook();
+ }
+-- 
+2.34.1
+

@@ -1,0 +1,92 @@
+From fe33d197f1fa6c6901051a6e50591c456d0b0bc7 Mon Sep 17 00:00:00 2001
+From: Samba Chi <samba.chi@mitaccomputing.com>
+Date: Thu, 2 Jan 2025 15:40:20 +0800
+Subject: [PATCH] Fix LinuxBoot build failed at assembly code
+
+---
+ payloads/external/LinuxBoot/Kconfig          | 21 +++++++++++++++-----
+ payloads/external/LinuxBoot/targets/linux.mk |  4 ++--
+ payloads/external/Makefile.mk                | 11 ++++++----
+ 3 files changed, 25 insertions(+), 11 deletions(-)
+
+diff --git a/payloads/external/LinuxBoot/Kconfig b/payloads/external/LinuxBoot/Kconfig
+index 24bfe3f112..b2fbfc6ead 100644
+--- a/payloads/external/LinuxBoot/Kconfig
++++ b/payloads/external/LinuxBoot/Kconfig
+@@ -66,12 +66,23 @@ config LINUXBOOT_KERNEL_PATH
+ if LINUXBOOT_COMPILE_KERNEL
+ 
+ config LINUXBOOT_CROSS_COMPILE
+-	string "cross compiler"
+-	default "" # e.g. "aarch64-linux-gnu-"
++	bool "cross compiler"
++	default n if LINUXBOOT_X86_64 # currently coreboots cross toolchain cannot build Linux
++	default y
+ 	help
+-	  Choose a custom cross compiler toolchain to use.
+-	  It can be useful if you don't want to use the coreboot toolchain
+-	  or experience problems using it.
++	  Enable this option if you want to compile Linux using a cross compiler.
++	  The coreboot toolchain also counts as a cross toolchain.
++
++config LINUXBOOT_CROSS_COMPILE_PATH
++  string "cross compiler"
++    depends on LINUXBOOT_CROSS_COMPILE
++    default "" # e.g. "aarch64-linux-gnu-"
++    help
++      Choose a custom cross compiler toolchain to use.
++	  The cross toolchain of coreboot will be used if this option is left empty.
++	  If not left empty, it should contain a path to a cross toolchain that is
++	  capable of compiling Linux. It can be useful if you don't want to use the
++	  coreboot toolchain or experience problems using it for building Linux.
+ 
+ config LINUXBOOT_KERNEL_VERSION
+ 	string "kernel version"
+diff --git a/payloads/external/LinuxBoot/targets/linux.mk b/payloads/external/LinuxBoot/targets/linux.mk
+index 1a882f143c..5cd3c540e0 100644
+--- a/payloads/external/LinuxBoot/targets/linux.mk
++++ b/payloads/external/LinuxBoot/targets/linux.mk
+@@ -2,9 +2,9 @@
+ 
+ SHELL := /bin/sh
+ 
+-OBJCOPY:=$(CONFIG_LINUXBOOT_CROSS_COMPILE)objcopy
++OBJCOPY:=$(CONFIG_LINUXBOOT_CROSS_COMPILE_PATH)objcopy
+ KERNEL_MAKE_FLAGS = \
+-	CROSS_COMPILE=$(CONFIG_LINUXBOOT_CROSS_COMPILE) \
++	CROSS_COMPILE=$(CONFIG_LINUXBOOT_CROSS_COMPILE_PATH) \
+ 	ARCH=$(LINUX_ARCH-y) \
+ 	KBUILD_BUILD_USER="coreboot" \
+ 	KBUILD_BUILD_HOST="reproducible" \
+diff --git a/payloads/external/Makefile.mk b/payloads/external/Makefile.mk
+index 53693f5917..ac5c856ce7 100644
+--- a/payloads/external/Makefile.mk
++++ b/payloads/external/Makefile.mk
+@@ -390,9 +390,12 @@ LINUXBOOT_CROSS_COMPILE_ARCH-$(CONFIG_LINUXBOOT_ARM)        = arm
+ LINUXBOOT_CROSS_COMPILE_ARCH-$(CONFIG_LINUXBOOT_ARM64)      = arm64
+ LINUXBOOT_CROSS_COMPILE_ARCH-$(CONFIG_LINUXBOOT_RISCV_RV32) = riscv
+ LINUXBOOT_CROSS_COMPILE_ARCH-$(CONFIG_LINUXBOOT_RISCV_RV64) = riscv
+-ifeq ($(CONFIG_LINUXBOOT_CROSS_COMPILE),"")
+-	CONFIG_LINUXBOOT_CROSS_COMPILE=$(CROSS_COMPILE_$(LINUXBOOT_CROSS_COMPILE_ARCH-y))
+-endif
++ifeq ($(CONFIG_LINUXBOOT_CROSS_COMPILE),y)
++ifeq ($(CONFIG_LINUXBOOT_CROSS_COMPILE_PATH),"")
++	# use coreboots cross toolchain
++	CONFIG_LINUXBOOT_CROSS_COMPILE_PATH=$(CROSS_COMPILE_$(LINUXBOOT_CROSS_COMPILE_ARCH-y))
++endif # CONFIG_LINUXBOOT_CROSS_COMPILE_PATH
++endif # CONFIG_LINUXBOOT_CROSS_COMPILE
+ .PHONY: linuxboot
+ payloads/external/LinuxBoot/build/Image linuxboot:
+ 	$(MAKE) -C payloads/external/LinuxBoot \
+@@ -403,7 +406,7 @@ payloads/external/LinuxBoot/build/Image linuxboot:
+ 		CONFIG_LINUXBOOT_ARM64=$(CONFIG_LINUXBOOT_ARM64) \
+ 		CONFIG_LINUXBOOT_RISCV_RV32=$(CONFIG_LINUXBOOT_RISCV_RV32) \
+ 		CONFIG_LINUXBOOT_RISCV_RV64=$(CONFIG_LINUXBOOT_RISCV_RV64) \
+-		CONFIG_LINUXBOOT_CROSS_COMPILE=$(CONFIG_LINUXBOOT_CROSS_COMPILE) \
++		CONFIG_LINUXBOOT_CROSS_COMPILE_PATH=$(CONFIG_LINUXBOOT_CROSS_COMPILE_PATH) \
+ 		CONFIG_LINUXBOOT_BUILD_INITRAMFS=$(CONFIG_LINUXBOOT_BUILD_INITRAMFS) \
+ 		CONFIG_LINUXBOOT_INITRAMFS_PATH=$(CONFIG_LINUXBOOT_INITRAMFS_PATH) \
+ 		CONFIG_LINUXBOOT_INITRAMFS_SUFFIX=$(CONFIG_LINUXBOOT_INITRAMFS_SUFFIX) \
+-- 
+2.34.1
+
